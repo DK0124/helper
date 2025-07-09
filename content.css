@@ -862,83 +862,74 @@
 }
 
 /* 列印樣式修正 */
+/* 列印樣式 - 使用舊版成功的方法 */
 @media print {
-  /* 基本設定 */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
-  
-  /* 隱藏控制元素 */
+  /* 隱藏所有控制面板元素 */
   #bv-shipping-assistant-panel,
   #bv-shipping-panel,
-  .bv-notification {
+  .bv-notification,
+  .ignore-print {
     display: none !important;
   }
   
-  /* 頁面設定 */
+  /* 重置基本樣式 */
+  * {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* 設定頁面大小 */
   @page {
     size: 100mm 150mm;
     margin: 0;
   }
   
-  /* 確保預覽容器正確顯示 */
-  #bv-preview-container {
-    display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
+  /* 隱藏頁面上的其他元素 */
+  body > *:not(#bv-preview-container) {
+    display: none !important;
   }
   
-  /* 每個列印頁面 */
-  .bv-print-page {
+  /* 預覽容器 */
+  #bv-preview-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    display: block !important;
+  }
+  
+  /* 每個頁面的列印設定 */
+  .bv-preview-page {
     page-break-after: always !important;
     page-break-inside: avoid !important;
-    position: relative !important;
+    box-shadow: none !important;
     margin: 0 !important;
     padding: 0 !important;
+    position: relative !important;
+    display: block !important;
+    width: 100mm !important;
+    height: 150mm !important;
+    overflow: hidden !important;
   }
   
-  .bv-print-page:last-child {
+  .bv-preview-page:last-child {
     page-break-after: auto !important;
   }
   
-  /* 確保圖片顯示 */
-  img {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    max-width: none !important;
-    page-break-inside: avoid !important;
-    image-rendering: -webkit-optimize-contrast !important;
+  /* 確保圖片顯示 - 使用舊版成功的設定 */
+  img, svg {
+    max-width: 100% !important;
+    height: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   
-  /* 特別處理 QR Code */
-  img[src*="QRCode"],
-  img[src*="qrcode"],
-  img[src*="ashx"] {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    transform: none !important;
-    filter: none !important;
-    -webkit-filter: none !important;
-  }
-  
-  /* 確保內容不被裁切 */
-  .bv-shipping-content,
-  .bv-detail-content {
-    overflow: visible !important;
-  }
-  
-  /* 保持表格結構 */
-  table { display: table !important; }
-  tr { display: table-row !important; }
-  td { display: table-cell !important; }
-  
-  /* 隱藏頁面其他元素 */
-  body > *:not(#bv-preview-container) {
-    display: none !important;
+  /* 確保內容元素都正確顯示 */
+  div, span, p, h1, h2, h3, h4, h5, h6, table, tr, td, th {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 
