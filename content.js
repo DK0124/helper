@@ -110,52 +110,54 @@
     }
   }
   
-  function fetchShippingData() {
-    const btn = document.getElementById('bv-fetch-btn');
-    btn.disabled = true;
-    btn.innerHTML = '抓取中...';
+// 修正 fetchShippingData 函數中的訂單編號提取部分
+function fetchShippingData() {
+  const btn = document.getElementById('bv-fetch-btn');
+  btn.disabled = true;
+  btn.innerHTML = '抓取中...';
+  
+  // 重新抓取，清空舊資料
+  shippingData = [];
+  
+  if (currentPage.provider === 'seven') {
+    console.log('開始抓取 7-11 物流單');
     
-    // 重新抓取，清空舊資料
-    shippingData = [];
+    // 優先使用 div_frame 類別
+    let frames = document.querySelectorAll('.div_frame');
     
-    if (currentPage.provider === 'seven') {
-      console.log('開始抓取 7-11 物流單');
+    // 如果沒找到，嘗試其他方式
+    if (frames.length === 0) {
+      // 找尋包含特定內容的 div
+      const allDivs = document.querySelectorAll('div');
+      const potentialFrames = [];
       
-      // 優先使用 div_frame 類別
-      let frames = document.querySelectorAll('.div_frame');
-      
-      // 如果沒找到，嘗試其他方式
-      if (frames.length === 0) {
-        // 找尋包含特定內容的 div
-        const allDivs = document.querySelectorAll('div');
-        const potentialFrames = [];
-        
-        allDivs.forEach(div => {
-          // 檢查是否包含物流單特徵
-          if (div.textContent.includes('交貨便') && 
-              div.textContent.includes('統一超商') &&
-              (div.querySelector('img[src*="QRCode"]') || div.querySelector('img[src*="qrcode"]'))) {
-            
-            // 找到最接近的包含容器
-            let container = div;
-            while (container.parentElement && 
-                   !container.style.border && 
-                   !container.className.includes('frame')) {
-              container = container.parentElement;
-            }
-            
-            if (!potentialFrames.includes(container)) {
-              potentialFrames.push(container);
-            }
+      allDivs.forEach(div => {
+        // 檢查是否包含物流單特徵
+        if (div.textContent.includes('交貨便') && 
+            div.textContent.includes('統一超商') &&
+            (div.querySelector('img[src*="QRCode"]') || div.querySelector('img[src*="qrcode"]'))) {
+          
+          // 找到最接近的包含容器
+          let container = div;
+          while (container.parentElement && 
+                 !container.style.border && 
+                 !container.className.includes('frame')) {
+            container = container.parentElement;
           }
-        });
-        
-        frames = potentialFrames;
-      }
+          
+          if (!potentialFrames.includes(container)) {
+            potentialFrames.push(container);
+          }
+        }
+      });
       
-      console.log('找到的物流單框架數量:', frames.length);
-      
-      frames.forEach((frame, index) => {
+      frames = potentialFrames;
+    }
+    
+    console.log('找到的物流單框架數量:', frames.length);
+    
+    frames.forEach((frame, index) => {
+      try {
         // 檢查內容是否足夠（避免抓到空框）
         if (frame.textContent.trim().length < 100) {
           console.log('跳過空框架:', index);
@@ -197,22 +199,32 @@
         
         wrapper.appendChild(clone);
         
-        // 提取訂單編號
+        // 提取訂單編號 - 使用更安全的方式
         let orderNo = '';
-        const text = clone.textContent;
+        const text = clone.textContent || '';
         
-        // 嘗試多種模式匹配訂單編號
-        const patterns = [
-          /寄件訂單編號[:：]\s*(\d+)/,
-          /訂單編號[:：]\s*(\d+)/,
-          /單號[:：]\s*(\d+)/
-        ];
-        
-        for (const pattern of patterns) {
-          const match = text.match(pattern);
-          if (match) {
-            orderNo = match[1];
-            break;
+        // 使用更簡單的字串搜尋方式
+        if (text.includes('寄件訂單編號')) {
+          const startIdx = text.indexOf('寄件訂單編號');
+          const subText = text.substring(startIdx);
+          const colonIdx = subText.search(/[:：]/);
+          if (colonIdx > -1) {
+            const afterColon = subText.substring(colonIdx + 1).trim();
+            const numberMatch = afterColon.match(/^(\d+)/);
+            if (numberMatch) {
+              orderNo = numberMatch[1];
+            }
+          }
+        } else if (text.includes('訂單編號')) {
+          const startIdx = text.indexOf('訂單編號');
+          const subText = text.substring(startIdx);
+          const colonIdx = subText.search(/[:：]/);
+          if (colonIdx > -1) {
+            const afterColon = subText.substring(colonIdx + 1).trim();
+            const numberMatch = afterColon.match(/^(\d+)/);
+            if (numberMatch) {
+              orderNo = numberMatch[1];
+            }
           }
         }
         
@@ -223,16 +235,35 @@
           orderNo: orderNo,
           index: index
         });
-      });
-    }
-    
-    // 儲存資料
+      } catch (error) {
+        console.error(`處理物流單 ${index + 1} 時發生錯誤:`, error);
+      }
+    });
+  }
+  
+  // 儲存資料
+  saveShippingData();
+}
+
+// 將儲存資料的邏輯獨立出來，加入錯誤處理
+function saveShippingData() {
+  const btn = document.getElementById('bv-fetch-btn');
+  
+  try {
     if (chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({ 
         bvShippingData: shippingData,
         lastProvider: currentPage.provider,
         timestamp: Date.now()
       }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('儲存資料時發生錯誤:', chrome.runtime.lastError);
+          btn.disabled = false;
+          btn.innerHTML = '重新抓取物流單';
+          showNotification('儲存資料失敗，請重試', 'error');
+          return;
+        }
+        
         btn.disabled = false;
         btn.innerHTML = '重新抓取物流單';
         btn.classList.remove('pulse');
@@ -244,8 +275,89 @@
           showNotification('未找到物流單，請確認頁面是否正確', 'warning');
         }
       });
+    } else {
+      throw new Error('Chrome storage API 不可用');
+    }
+  } catch (error) {
+    console.error('儲存資料時發生錯誤:', error);
+    btn.disabled = false;
+    btn.innerHTML = '重新抓取物流單';
+    showNotification('儲存資料失敗，請重新整理頁面後再試', 'error');
+  }
+}
+
+// 修改主程式執行部分，加入錯誤處理
+if (chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    try {
+      if (request.action === 'togglePanel') {
+        if (currentPage.type === 'detail') {
+          if (panelActive) {
+            deactivateDetailPanel();
+          } else {
+            activateDetailPanel();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('處理訊息時發生錯誤:', error);
+    }
+    return true; // 保持訊息通道開啟
+  });
+}
+
+// 檢查擴充功能是否仍然有效
+function checkExtensionValid() {
+  try {
+    if (chrome.runtime && chrome.runtime.id) {
+      return true;
+    }
+  } catch (e) {
+    console.error('擴充功能已失效:', e);
+    // 顯示錯誤訊息
+    const existingPanel = document.getElementById('bv-shipping-panel');
+    if (existingPanel) {
+      const errorMsg = document.createElement('div');
+      errorMsg.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #ff4444;
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        z-index: 999999;
+        text-align: center;
+      `;
+      errorMsg.innerHTML = `
+        <h3>擴充功能需要重新載入</h3>
+        <p>請重新整理頁面 (F5) 或重新啟動瀏覽器</p>
+      `;
+      document.body.appendChild(errorMsg);
     }
   }
+  return false;
+}
+
+// 在初始化前檢查
+if (currentPage.type === 'shipping') {
+  // 物流單頁自動顯示面板
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      if (checkExtensionValid()) {
+        setTimeout(injectShippingPanel, 300);
+      }
+    });
+  } else {
+    if (checkExtensionValid()) {
+      setTimeout(injectShippingPanel, 300);
+    }
+  }
+} else if (currentPage.type === 'detail') {
+  // 明細頁等待使用者啟動
+  console.log('BV SHOP 出貨明細頁面已偵測，點擊擴充功能圖示以啟動');
+}
   
   // === 明細頁面專用函數 ===
   
