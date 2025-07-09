@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BV SHOP 出貨助手",
-  "version": "2.1.0",
-  "description": "BV SHOP 物流單與出貨明細列印助手",
+  "version": "2.2.0",
+  "description": "BV SHOP 物流單與出貨明細列印助手 - 支援物流編號智慧配對",
   "permissions": [
     "storage",
     "scripting",
@@ -16,7 +16,9 @@
     "https://*.hilife.com.tw/*",
     "https://*.okmart.com.tw/*",
     "https://*.bvshop.tw/*",
-    "http://*.bvshop.tw/*"
+    "http://*.bvshop.tw/*",
+    "https://bvshop.tw/*",
+    "http://bvshop.tw/*"
   ],
   "background": {
     "service_worker": "background.js"
