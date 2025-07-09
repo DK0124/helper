@@ -651,18 +651,24 @@
 .bv-field-list {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 12px;
 }
 
-.bv-field-list label {
+.bv-field-list .bv-field-item {
   display: flex;
   align-items: center;
-  font-size: 12px;
+  font-size: 13px;
   color: #333;
 }
 
 .bv-field-list input[type="checkbox"] {
-  margin-right: 6px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.bv-field-list .bv-field-label {
+  cursor: pointer;
+  user-select: none;
 }
 
 /* Logo 上傳樣式 */
