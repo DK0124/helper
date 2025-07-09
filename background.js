@@ -73,10 +73,11 @@ async function injectContentScript(tabId) {
 
 // 處理擴充功能圖示點擊
 chrome.action.onClicked.addListener(async (tab) => {
+  console.log('擴充功能圖示被點擊，當前頁面:', tab.url);
+  
   // 檢查是否為支援的頁面
   if (!isSupportedUrl(tab.url)) {
     console.log('不支援的網站:', tab.url);
-    // 可以在這裡顯示提示，但不使用 notifications API
     return;
   }
   
@@ -99,6 +100,8 @@ chrome.action.onClicked.addListener(async (tab) => {
   
   if (!toggleResponse) {
     console.error('無法與 content script 通訊');
+  } else {
+    console.log('切換面板回應:', toggleResponse);
   }
 });
 
@@ -176,11 +179,3 @@ chrome.runtime.onStartup.addListener(() => {
 self.addEventListener('activate', event => {
   console.log('Service Worker 已啟動');
 });
-
-// 確保 Service Worker 保持活躍（Chrome 110+ 不需要這個）
-// 如果你的 Chrome 版本較舊，可以取消註解以下程式碼
-/*
-const keepAlive = () => setInterval(chrome.runtime.getPlatformInfo, 20e3);
-chrome.runtime.onStartup.addListener(keepAlive);
-keepAlive();
-*/
