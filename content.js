@@ -279,80 +279,67 @@
   function generateShippingPage(data, settings, orderNo) {
     if (!data || !data.html) return '';
     
-    // 7-11 物流單實際是 100×140mm，但印在 100×150mm 紙上
-    // 所以需要垂直置中，上下各留 5mm
-    const verticalOffset = currentPage.provider === 'seven' ? 5 : 0;
-    
-    return `
+    let html = `
       <div style="
-        width: ${settings.paper.width}mm;
-        height: ${settings.paper.height}mm;
+        width: 100%;
+        height: 100%;
         position: relative;
         overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: white;
       ">
-        <!-- 物流單內容 -->
         <div style="
           position: relative;
           transform: scale(${settings.paper.scale / 100});
           transform-origin: center center;
         ">
           ${data.html}
-          
-          <!-- 訂單編號標籤 -->
-          ${settings.showOrderNumber && orderNo ? `
-            <div style="
-              position: absolute;
-              top: ${settings.orderLabelTop}mm;
-              left: 50%;
-              transform: translateX(-50%);
-              background: white;
-              padding: 2px 8px;
-              border: 1px solid #333;
-              border-radius: 3px;
-              font-size: ${settings.orderLabelSize}px;
-              font-weight: bold;
-              z-index: 10;
-            ">
-              訂單編號：${orderNo}
-            </div>
-          ` : ''}
-          
-          <!-- Logo -->
-          ${settings.shipping.logo ? `
-            <img src="${settings.shipping.logo}" style="
-              position: absolute;
-              top: ${settings.shipping.logoY}%;
-              left: ${settings.shipping.logoX}%;
-              transform: translate(-50%, -50%);
-              width: ${settings.shipping.logoSize}mm;
-              opacity: ${1 - (settings.shipping.logoOpacity / 100)};
-              pointer-events: none;
-              z-index: 5;
-            ">
-          ` : ''}
         </div>
-      </div>
     `;
-  }
-  
-  function loadExternalResources() {
-    if (!document.querySelector('link[href*="Material+Icons"]')) {
-      const iconLink = document.createElement('link');
-      iconLink.rel = 'stylesheet';
-      iconLink.href = 'https://fonts.googleapis.com/icon?family=Material+Icons';
-      document.head.appendChild(iconLink);
+    
+    // 訂單編號
+    if (settings.showOrderNumber && orderNo) {
+      html += `
+        <div style="
+          position: absolute;
+          top: ${settings.orderLabelTop}mm;
+          left: 50%;
+          transform: translateX(-50%);
+          background: white;
+          padding: 4px 12px;
+          border: 1px solid #333;
+          border-radius: 4px;
+          font-size: ${settings.orderLabelSize}px;
+          font-weight: bold;
+          z-index: 10;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          white-space: nowrap;
+        ">
+          訂單編號：${orderNo}
+        </div>
+      `;
     }
     
-    if (!document.querySelector('link[href*="Noto+Sans+TC"]')) {
-      const fontLink = document.createElement('link');
-      fontLink.rel = 'stylesheet';
-      fontLink.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap';
-      document.head.appendChild(fontLink);
+    // Logo
+    if (settings.shipping.logo) {
+      html += `
+        <img src="${settings.shipping.logo}" style="
+          position: absolute;
+          top: ${settings.shipping.logoY}%;
+          left: ${settings.shipping.logoX}%;
+          transform: translate(-50%, -50%);
+          width: ${settings.shipping.logoSize}mm;
+          opacity: ${settings.shipping.logoOpacity / 100};
+          pointer-events: none;
+          z-index: 5;
+        ">
+      `;
     }
+    
+    html += '</div>';
+    
+    return html;
   }
   
   function getDetailPanelHTML() {
