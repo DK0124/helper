@@ -866,15 +866,25 @@
   /* 隱藏所有控制面板元素 */
   #bv-shipping-assistant-panel,
   #bv-shipping-panel,
-  .bv-notification {
+  .bv-notification,
+  .ignore-print {
     display: none !important;
   }
   
+  /* 重置所有元素的基本樣式 */
+  * {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+  
   /* 重置body樣式 */
-  body {
+  html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: white !important;
+    width: 100% !important;
+    height: 100% !important;
   }
   
   /* 設定列印容器 */
@@ -883,6 +893,7 @@
     padding: 0 !important;
     gap: 0 !important;
     display: block !important;
+    width: 100% !important;
   }
   
   /* 每個頁面的列印設定 */
@@ -895,6 +906,9 @@
     padding: 0 !important;
     position: relative !important;
     display: block !important;
+    width: 100mm !important;
+    height: 150mm !important;
+    overflow: hidden !important;
   }
   
   .bv-preview-page:last-child {
@@ -906,12 +920,29 @@
     margin: 0 !important;
     padding: 0 !important;
     page-break-inside: avoid !important;
+    width: 100mm !important;
+    height: 150mm !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+  
+  /* 物流單內部的 div_frame 樣式調整 */
+  .bv-shipping-content .div_frame {
+    transform-origin: top left !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
   }
   
   /* 明細內容列印樣式 */
   .bv-detail-content {
     margin: 0 !important;
+    padding: 5mm !important;
     page-break-inside: avoid !important;
+    width: 100mm !important;
+    height: 150mm !important;
+    box-sizing: border-box !important;
   }
   
   /* 確保圖片在列印時顯示 */
@@ -928,10 +959,15 @@
     print-color-adjust: exact !important;
   }
   
-  /* 設定頁面大小 */
+  /* 設定頁面大小和邊距 */
   @page {
     size: 100mm 150mm;
     margin: 0;
+  }
+  
+  /* 隱藏頁面上的其他元素 */
+  body > *:not(#bv-preview-container) {
+    display: none !important;
   }
 }
 
