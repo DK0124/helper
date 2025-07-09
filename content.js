@@ -534,7 +534,7 @@
           </div>
           <div class="bv-section-content" id="basic-content">
             <div class="bv-control-group">
-              <div class="bv-control-group-title">紙張設定（統一）</div>
+              <div class="bv-control-group-title">紙張設定</div>
               <div class="bv-control-label">
                 <span>紙張寬度</span>
                 <span class="bv-value-badge" id="bv-paper-width-value">100mm</span>
@@ -548,7 +548,7 @@
               <input type="range" id="bv-paper-height" min="50" max="400" value="150" class="bv-range">
               
               <div class="bv-control-label" style="margin-top: 20px;">
-                <span>縮放比例</span>
+                <span>出貨明細縮放</span>
                 <span class="bv-value-badge" id="bv-scale-value">100%</span>
               </div>
               <input type="range" id="bv-scale" min="50" max="150" value="100" class="bv-range">
