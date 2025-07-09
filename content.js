@@ -172,25 +172,38 @@
     if (currentPage.provider === 'seven') {
       console.log('開始抓取 7-11 物流單');
       
+      // 獲取當前頁面的所有樣式
+      const allStyles = Array.from(document.styleSheets).map(sheet => {
+        try {
+          return Array.from(sheet.cssRules).map(rule => rule.cssText).join('\n');
+        } catch (e) {
+          // 跨域樣式表無法讀取
+          return '';
+        }
+      }).join('\n');
+      
+      // 獲取頁面的 DOCTYPE
+      const doctype = document.doctype;
+      const doctypeString = doctype ? 
+        `<!DOCTYPE ${doctype.name}${doctype.publicId ? ` PUBLIC "${doctype.publicId}"` : ''}${doctype.systemId ? ` "${doctype.systemId}"` : ''}>` : 
+        '';
+      
       // 找到所有物流單框架
       let frames = document.querySelectorAll('.div_frame');
       
       if (frames.length === 0) {
-        // 嘗試其他方式找物流單
+        // 嘗試其他方式
         const allDivs = document.querySelectorAll('div');
         const potentialFrames = [];
         
         allDivs.forEach(div => {
-          // 檢查是否包含物流單特徵
           if (div.textContent.includes('交貨便') && 
               div.textContent.includes('統一超商') &&
               (div.querySelector('img[src*="QRCode"]') || div.querySelector('img[src*="qrcode"]'))) {
             
-            // 找到包含完整物流單的容器
             let container = div;
             while (container.parentElement) {
               const rect = container.getBoundingClientRect();
-              // 7-11 物流單標準尺寸約為 283px × 425px
               if (rect.width >= 250 && rect.width <= 350 && 
                   rect.height >= 400 && rect.height <= 500) {
                 break;
@@ -211,53 +224,55 @@
       
       frames.forEach((frame, index) => {
         try {
-          // 檢查內容是否足夠
           if (frame.textContent.trim().length < 100) {
             console.log('跳過空框架:', index);
             return;
           }
           
-          // 克隆整個框架，保持原始結構
-          const clone = frame.cloneNode(true);
+          // 創建一個包含完整樣式的 HTML
+          const frameClone = frame.cloneNode(true);
           
-          // 確保所有樣式都被保留
-          const computedStyle = window.getComputedStyle(frame);
-          clone.style.width = computedStyle.width;
-          clone.style.height = computedStyle.height;
-          clone.style.border = computedStyle.border;
-          clone.style.padding = computedStyle.padding;
-          clone.style.margin = '0';
-          clone.style.boxSizing = 'border-box';
-          
-          // 處理所有圖片，確保 URL 完整
-          const images = clone.querySelectorAll('img');
+          // 處理圖片 URL
+          const images = frameClone.querySelectorAll('img');
           images.forEach(img => {
             const originalSrc = img.getAttribute('src');
             if (originalSrc && !originalSrc.startsWith('data:') && !originalSrc.startsWith('http')) {
               img.src = new URL(originalSrc, window.location.href).href;
             }
-            // 保留圖片尺寸
-            if (img.hasAttribute('width')) {
-              img.style.width = img.getAttribute('width') + 'px';
-            }
-            if (img.hasAttribute('height')) {
-              img.style.height = img.getAttribute('height') + 'px';
-            }
           });
           
-          // 提取必要資訊
+          // 建立完整的 HTML 文檔
+          const fullHtml = `
+            ${doctypeString}
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <style>
+                body {
+                  margin: 0;
+                  padding: 0;
+                  background: white;
+                }
+                ${allStyles}
+              </style>
+            </head>
+            <body>
+              ${frameClone.outerHTML}
+            </body>
+            </html>
+          `;
+          
+          // 提取資訊
           let orderNo = '';
           let serviceCode = '';
-          const text = clone.textContent || '';
+          const text = frameClone.textContent || '';
           
-          // 提取訂單編號
           const orderMatch = text.match(/(?:寄件)?訂單編號[：:]\s*(\d+)/);
           if (orderMatch) {
             orderNo = orderMatch[1];
           }
           
-          // 提取服務代碼（物流編號）
-          const serviceCodeElement = clone.querySelector('span[id*="lblC2BPinCode"]');
+          const serviceCodeElement = frameClone.querySelector('span[id*="lblC2BPinCode"]');
           if (serviceCodeElement) {
             serviceCode = serviceCodeElement.textContent.trim();
           } else {
@@ -269,13 +284,11 @@
           
           console.log(`物流單 ${index + 1} - 訂單編號: ${orderNo || '未找到'}, 服務代碼: ${serviceCode || '未找到'}`);
           
-          // 儲存原始尺寸和內容
           shippingData.push({
-            html: clone.outerHTML,
+            html: frameClone.outerHTML,
+            fullHtml: fullHtml,
             orderNo: orderNo,
             serviceCode: serviceCode,
-            originalWidth: computedStyle.width,
-            originalHeight: computedStyle.height,
             index: index
           });
         } catch (error) {
@@ -1236,9 +1249,10 @@
     if (!data) return '';
     
     const displayOrderNo = customOrderNo || data.orderNo;
+    const uniqueId = `shipping-frame-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // 不使用縮放，讓物流單保持原始大小，並置中顯示
-    return `
+    // 創建頁面結構
+    const pageHtml = `
       <div class="bv-shipping-content" style="
         width: ${settings.paper.width}mm;
         height: ${settings.paper.height}mm;
@@ -1270,8 +1284,8 @@
                ">
         ` : ''}
         
-        <!-- 物流單原始內容（中層） -->
-        <div style="
+        <!-- iframe 容器 -->
+        <div id="${uniqueId}" style="
           z-index: 2;
           position: relative;
         ">
@@ -1303,7 +1317,10 @@
         ` : ''}
       </div>
     `;
+    
+    return pageHtml;
   }
+
   
   function generateDetailPage(data, settings) {
     if (!data || !data.orderInfo) return '';
@@ -1585,59 +1602,133 @@
       return;
     }
     
-    // 在列印前添加特殊的列印樣式
-    const printStyle = document.createElement('style');
-    printStyle.id = 'bv-print-override';
-    printStyle.textContent = `
-      @media print {
-        @page {
-          size: 100mm 150mm !important;
-          margin: 0 !important;
-        }
-        
-        html, body {
-          width: 100mm !important;
-          height: auto !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          overflow: visible !important;
-        }
-        
-        #bv-preview-container {
-          position: absolute !important;
-          top: 0 !important;
-          left: 0 !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        }
-        
-        .bv-preview-page {
-          margin: 0 !important;
-          padding: 0 !important;
-          width: 100mm !important;
-          height: 150mm !important;
-          page-break-after: always !important;
-        }
-        
-        .bv-preview-page:last-child {
-          page-break-after: auto !important;
-        }
-      }
-    `;
-    document.head.appendChild(printStyle);
+    // 創建一個新的列印視窗
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
     
-    // 執行列印
-    setTimeout(() => {
-      window.print();
-      
-      // 列印後移除臨時樣式
-      setTimeout(() => {
-        const tempStyle = document.getElementById('bv-print-override');
-        if (tempStyle) {
-          tempStyle.remove();
+    // 建立列印文檔
+    const printDoc = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>列印 - BV SHOP 出貨助手</title>
+        <style>
+          @page {
+            size: 100mm 150mm;
+            margin: 0;
+          }
+          
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
+          body {
+            margin: 0;
+            padding: 0;
+            background: white;
+          }
+          
+          .print-page {
+            width: 100mm;
+            height: 150mm;
+            position: relative;
+            page-break-after: always;
+            page-break-inside: avoid;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+          }
+          
+          .print-page:last-child {
+            page-break-after: auto;
+          }
+          
+          .bv-shipping-content,
+          .bv-detail-content {
+            width: 100mm;
+            height: 150mm;
+            position: relative;
+            margin: 0;
+            padding: 0;
+          }
+          
+          .bv-watermark-logo {
+            position: absolute;
+            pointer-events: none;
+          }
+          
+          @media screen {
+            body {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              padding: 20px;
+              background: #f0f0f0;
+            }
+            
+            .print-page {
+              background: white;
+              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+              margin-bottom: 20px;
+            }
+          }
+        </style>
+        ${getDetailStyles()}
+      </head>
+      <body>
+        ${pages.map(page => `<div class="print-page">${page.innerHTML}</div>`).join('')}
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 1000);
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(printDoc);
+    printWindow.document.close();
+  }
+  
+  // 獲取明細頁面的樣式
+  function getDetailStyles() {
+    return `
+      <style>
+        /* 明細頁面樣式 */
+        .bv-detail-content {
+          font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+          box-sizing: border-box;
         }
-      }, 1000);
-    }, 100);
+        
+        .bv-detail-content table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        
+        .bv-detail-content th,
+        .bv-detail-content td {
+          padding: 4px;
+          text-align: left;
+        }
+        
+        .bv-detail-content th {
+          border-top: 2px solid black;
+          border-bottom: 2px solid black;
+        }
+        
+        .bv-detail-content td {
+          border-bottom: 1px solid #ddd;
+        }
+        
+        /* 其他必要的樣式 */
+      </style>
+    `;
   }
   
   // 工具函數
