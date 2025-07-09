@@ -1,39 +1,26 @@
 {
   "manifest_version": 3,
   "name": "BV SHOP 出貨助手",
-  "version": "2.0.0",
-  "description": "協助處理 BV SHOP 出貨單據的列印與管理",
+  "version": "2.1.0",
+  "description": "BV SHOP 物流單與出貨明細列印助手",
   "permissions": [
     "storage",
-    "activeTab",
     "scripting",
-    "alarms"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
-    "*://*.7-11.com.tw/*",
-    "*://*.bvshop-manage.tw/*",
-    "*://*.family.com.tw/*",
-    "*://*.famiport.com.tw/*",
-    "*://*.hilife.com.tw/*",
-    "*://*.okmart.com.tw/*"
+    "https://*.7-11.com.tw/*",
+    "https://*.family.com.tw/*",
+    "https://*.famiport.com.tw/*",
+    "https://*.hilife.com.tw/*",
+    "https://*.okmart.com.tw/*",
+    "https://*.bvshop.tw/*",
+    "http://*.bvshop.tw/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "*://*.7-11.com.tw/*",
-        "*://*.family.com.tw/*",
-        "*://*.famiport.com.tw/*",
-        "*://*.hilife.com.tw/*",
-        "*://*.okmart.com.tw/*"
-      ],
-      "js": ["content.js"],
-      "css": ["content.css"],
-      "run_at": "document_idle"
-    }
-  ],
   "action": {
     "default_title": "BV SHOP 出貨助手",
     "default_icon": {
@@ -44,12 +31,26 @@
   },
   "icons": {
     "16": "icons/icon-16.png",
-     "48": "icons/icon-48.png",
+    "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.7-11.com.tw/*",
+        "https://*.family.com.tw/*",
+        "https://*.famiport.com.tw/*",
+        "https://*.hilife.com.tw/*",
+        "https://*.okmart.com.tw/*"
+      ],
+      "css": ["content.css"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
   "web_accessible_resources": [
     {
-      "resources": ["popup.html", "welcome.html", "update.html"],
+      "resources": ["icons/icon-16.png", "icons/icon-48.png", "icons/icon-128.png"],
       "matches": ["<all_urls>"]
     }
   ]
