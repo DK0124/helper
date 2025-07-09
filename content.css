@@ -863,13 +863,18 @@
 
 /* 列印樣式 - 修正列印時的版面問題 */
 @media print {
-  /* 隱藏所有控制面板元素 */
-  #bv-shipping-assistant-panel,
-  #bv-shipping-panel,
-  .bv-notification,
-  .ignore-print {
-    display: none !important;
+  img, svg {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    display: block !important;
+    filter: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    background: none !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
   }
+}
   
   /* 重置所有元素的基本樣式 */
   * {
