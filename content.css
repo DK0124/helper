@@ -977,7 +977,7 @@
     height: 150mm !important;
   }
   
-  /* 確保圖片在列印時正確顯示 */
+  /* 確保圖片在列印時正確顯示 - 包括底圖 */
   img {
     display: inline-block !important;
     visibility: visible !important;
@@ -985,6 +985,16 @@
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     opacity: 1 !important;
+  }
+  
+  /* 底圖的淡化效果在列印時需要特別處理 */
+  .bv-watermark-logo {
+    display: block !important;
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    filter: opacity(var(--opacity)) !important;
+    -webkit-filter: opacity(var(--opacity)) !important;
   }
   
   /* 特別處理 QR Code 圖片 */
