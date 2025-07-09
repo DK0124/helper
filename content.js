@@ -372,6 +372,12 @@
           if (document.querySelector('.order-content')) {
             setTimeout(fetchDetailData, 500);
           }
+          
+          // 第一次使用時顯示提示
+          if (!localStorage.getItem('bv-print-tip-shown')) {
+            showNotification('提示：如果列印預覽時內容太小，請在列印對話框中將「縮放」設定為「符合頁面大小」', 'info');
+            localStorage.setItem('bv-print-tip-shown', 'true');
+          }
         }, 100);
         
         panelActive = true;
@@ -1199,19 +1205,17 @@
     if (!data) return '';
     
     const displayOrderNo = customOrderNo || data.orderNo;
-    
-    // 計算縮放後的尺寸和位置
     const scale = settings.paper.scale / 100;
-    const containerWidth = settings.paper.width;
-    const containerHeight = settings.paper.height;
     
     return `
       <div class="bv-shipping-content" style="
-        width: ${containerWidth}mm;
-        height: ${containerHeight}mm;
+        width: 100mm;
+        height: 150mm;
         position: relative;
         overflow: hidden;
         background: white;
+        margin: 0;
+        padding: 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1227,6 +1231,7 @@
                  transform: translate(-50%, -50%);
                  width: ${settings.shipping.logoSize}mm;
                  opacity: ${settings.shipping.logoOpacity / 100};
+                 --opacity: ${settings.shipping.logoOpacity / 100};
                  pointer-events: none;
                  z-index: 1;
                ">
@@ -1546,8 +1551,59 @@
       return;
     }
     
-    // 直接呼叫列印
-    window.print();
+    // 在列印前添加特殊的列印樣式
+    const printStyle = document.createElement('style');
+    printStyle.id = 'bv-print-override';
+    printStyle.textContent = `
+      @media print {
+        @page {
+          size: 100mm 150mm !important;
+          margin: 0 !important;
+        }
+        
+        html, body {
+          width: 100mm !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: visible !important;
+        }
+        
+        #bv-preview-container {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        
+        .bv-preview-page {
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100mm !important;
+          height: 150mm !important;
+          page-break-after: always !important;
+        }
+        
+        .bv-preview-page:last-child {
+          page-break-after: auto !important;
+        }
+      }
+    `;
+    document.head.appendChild(printStyle);
+    
+    // 執行列印
+    setTimeout(() => {
+      window.print();
+      
+      // 列印後移除臨時樣式
+      setTimeout(() => {
+        const tempStyle = document.getElementById('bv-print-override');
+        if (tempStyle) {
+          tempStyle.remove();
+        }
+      }, 1000);
+    }, 100);
   }
   
   // 工具函數
