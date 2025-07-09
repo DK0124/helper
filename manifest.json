@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "BV SHOP 出貨助手",
+  "version": "2.0.0",
+  "description": "協助處理 BV SHOP 出貨單據的列印與管理",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "*://*.7-11.com.tw/*",
+    "*://*.bvshop-manage.tw/*",
+    "*://*.family.com.tw/*",
+    "*://*.famiport.com.tw/*",
+    "*://*.hilife.com.tw/*",
+    "*://*.okmart.com.tw/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.7-11.com.tw/*",
+        "*://*.family.com.tw/*",
+        "*://*.famiport.com.tw/*",
+        "*://*.hilife.com.tw/*",
+        "*://*.okmart.com.tw/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "BV SHOP 出貨助手",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+     "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "welcome.html", "update.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
