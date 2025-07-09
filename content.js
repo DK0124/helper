@@ -3,7 +3,26 @@
   'use strict';
   
   console.log('BV SHOP 出貨助手已載入');
-  
+
+// 通知 background script content script 已準備就緒
+if (chrome.runtime && chrome.runtime.sendMessage) {
+  chrome.runtime.sendMessage({ action: 'contentScriptReady' }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.log('無法連接到 background script:', chrome.runtime.lastError);
+    }
+  });
+}
+
+// 回應 ping 訊息
+if (chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'ping') {
+      sendResponse({ status: 'pong' });
+      return true;
+    }
+  });
+}  
+
   // 全域變數
   let currentPage = detectCurrentPage();
   let shippingData = [];
