@@ -996,7 +996,13 @@
   }
   
   function generateShippingPage(data, settings, orderNo) {
-    if (!data) return '';
+    if (!data || !data.html) return '';
+    
+    // 清理HTML內容
+    let cleanedHtml = data.html;
+    
+    // 移除可能的空白元素和換行
+    cleanedHtml = cleanedHtml.replace(/>\s+</g, '><');
     
     return `
       <div class="bv-shipping-content" style="
@@ -1040,8 +1046,9 @@
           display: flex;
           align-items: center;
           justify-content: center;
+          position: relative;
         ">
-          ${data.html}
+          ${cleanedHtml}
         </div>
         
         ${settings.shipping.logo ? `
