@@ -863,7 +863,14 @@
 
 /* 列印樣式 - 專門針對 7-11 物流單優化 */
 @media print {
-  /* 隱藏所有控制面板元素 */
+  /* 基本重置 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  
+  /* 隱藏控制面板 */
   #bv-shipping-assistant-panel,
   #bv-shipping-panel,
   .bv-notification,
@@ -871,45 +878,21 @@
     display: none !important;
   }
   
-  /* 重置基本樣式 */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
+  /* 設定頁面大小 */
+  @page {
+    size: 100mm 150mm;
+    margin: 0;
   }
   
-  /* 重置 body 樣式 */
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: white !important;
-    width: 100% !important;
-    height: 100% !important;
-  }
-  
-  /* 設定列印容器 */
-  #bv-preview-container {
-    margin: 0 !important;
-    padding: 0 !important;
-    gap: 0 !important;
-    display: block !important;
-    width: 100% !important;
-  }
-  
-  /* 每個頁面的列印設定 */
-  .bv-preview-page,
-  .bv-print-page {
+  /* 預覽頁面樣式 */
+  .bv-preview-page {
     page-break-after: always !important;
     page-break-inside: avoid !important;
-    break-after: page !important;
-    break-inside: avoid !important;
-    box-shadow: none !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     padding: 0 !important;
-    position: relative !important;
-    display: block !important;
     width: 100mm !important;
     height: 150mm !important;
+    position: relative !important;
     overflow: hidden !important;
   }
   
@@ -917,100 +900,73 @@
     page-break-after: auto !important;
   }
   
-  /* 物流單內容列印樣式 */
+  /* 物流單內容 */
   .bv-shipping-content {
-    margin: 0 !important;
-    padding: 0 !important;
-    page-break-inside: avoid !important;
     width: 100mm !important;
     height: 150mm !important;
-    position: relative !important;
-    overflow: hidden !important;
-  }
-  
-  /* 保持物流單原始結構 */
-  .div_frame {
-    width: 300px !important;
-    height: 450px !important;
     margin: 0 !important;
     padding: 0 !important;
     position: relative !important;
-  }
-  
-  /* 明細內容列印樣式 */
-  .bv-detail-content {
-    margin: 0 !important;
-    padding: 5mm !important;
-    page-break-inside: avoid !important;
-    width: 100mm !important;
-    height: 150mm !important;
-    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
   
   /* 確保所有圖片都顯示 */
   img {
-    display: block !important;
+    display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    max-width: 100% !important;
+    max-width: none !important;
+    width: auto !important;
     height: auto !important;
+    page-break-inside: avoid !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
   }
   
-  /* 特別確保 QR Code 圖片顯示 */
+  /* 特別確保 QR Code 顯示 */
   img[src*="QRCode"],
   img[src*="qrcode"],
-  img[src*="barcode"],
-  img[src*=".ashx"] {
-    display: block !important;
+  img[src*="ashx"],
+  img[width="150"],
+  img[width="80"] {
+    display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
+    -webkit-filter: none !important;
     filter: none !important;
     transform: none !important;
-    -webkit-filter: none !important;
-    -webkit-transform: none !important;
-    image-rendering: -webkit-optimize-contrast !important;
-    image-rendering: crisp-edges !important;
   }
   
-  /* 確保表格和文字正確顯示 */
-  table, tr, td, th, div, span, p {
-    visibility: visible !important;
-    opacity: 1 !important;
+  /* 確保表格正確顯示 */
+  table {
     display: table !important;
-  }
-  
-  td, th {
-    display: table-cell !important;
+    visibility: visible !important;
   }
   
   tr {
     display: table-row !important;
+    visibility: visible !important;
   }
   
-  /* 設定頁面大小和邊距 */
-  @page {
-    size: 100mm 150mm;
-    margin: 0;
+  td {
+    display: table-cell !important;
+    visibility: visible !important;
   }
   
-  /* 隱藏頁面上的其他元素 */
+  /* 隱藏其他元素 */
   body > *:not(#bv-preview-container) {
     display: none !important;
   }
 }
 
-/* Mac Chrome 特別優化 */
-@media print and (-webkit-min-device-pixel-ratio: 0) {
-  img {
-    image-rendering: auto !important;
-    -webkit-print-color-adjust: exact !important;
-  }
-  
-  .bv-shipping-content img {
-    will-change: transform !important;
+/* Mac 特別優化 */
+@supports (-webkit-appearance: none) {
+  @media print {
+    img {
+      image-rendering: auto !important;
+      -webkit-print-color-adjust: exact !important;
+    }
   }
 }
