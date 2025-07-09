@@ -161,7 +161,7 @@
     }
   }
   
-  // 修正抓取物流單的方式 - 保持原始格式
+  // 簡化的抓取物流單方式
   function fetchShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
     btn.disabled = true;
@@ -172,107 +172,90 @@
     if (currentPage.provider === 'seven') {
       console.log('開始抓取 7-11 物流單');
       
-      // 獲取當前頁面的所有樣式
-      const allStyles = Array.from(document.styleSheets).map(sheet => {
-        try {
-          return Array.from(sheet.cssRules).map(rule => rule.cssText).join('\n');
-        } catch (e) {
-          // 跨域樣式表無法讀取
-          return '';
-        }
-      }).join('\n');
-      
-      // 獲取頁面的 DOCTYPE
-      const doctype = document.doctype;
-      const doctypeString = doctype ? 
-        `<!DOCTYPE ${doctype.name}${doctype.publicId ? ` PUBLIC "${doctype.publicId}"` : ''}${doctype.systemId ? ` "${doctype.systemId}"` : ''}>` : 
-        '';
-      
-      // 找到所有物流單框架
+      // 直接使用原始的選擇器
       let frames = document.querySelectorAll('.div_frame');
-      
-      if (frames.length === 0) {
-        // 嘗試其他方式
-        const allDivs = document.querySelectorAll('div');
-        const potentialFrames = [];
-        
-        allDivs.forEach(div => {
-          if (div.textContent.includes('交貨便') && 
-              div.textContent.includes('統一超商') &&
-              (div.querySelector('img[src*="QRCode"]') || div.querySelector('img[src*="qrcode"]'))) {
-            
-            let container = div;
-            while (container.parentElement) {
-              const rect = container.getBoundingClientRect();
-              if (rect.width >= 250 && rect.width <= 350 && 
-                  rect.height >= 400 && rect.height <= 500) {
-                break;
-              }
-              container = container.parentElement;
-            }
-            
-            if (!potentialFrames.includes(container)) {
-              potentialFrames.push(container);
-            }
-          }
-        });
-        
-        frames = potentialFrames;
-      }
       
       console.log('找到的物流單框架數量:', frames.length);
       
       frames.forEach((frame, index) => {
         try {
-          if (frame.textContent.trim().length < 100) {
-            console.log('跳過空框架:', index);
-            return;
-          }
+          // 取得計算後的樣式
+          const computedStyle = window.getComputedStyle(frame);
           
-          // 創建一個包含完整樣式的 HTML
-          const frameClone = frame.cloneNode(true);
+          // 創建一個新的 div 來包裝內容
+          const wrapper = document.createElement('div');
+          wrapper.className = 'bv-shipping-wrapper';
           
-          // 處理圖片 URL
-          const images = frameClone.querySelectorAll('img');
-          images.forEach(img => {
-            const originalSrc = img.getAttribute('src');
-            if (originalSrc && !originalSrc.startsWith('data:') && !originalSrc.startsWith('http')) {
-              img.src = new URL(originalSrc, window.location.href).href;
+          // 複製所有樣式屬性
+          wrapper.style.cssText = frame.style.cssText;
+          wrapper.style.width = computedStyle.width;
+          wrapper.style.height = computedStyle.height;
+          wrapper.style.border = computedStyle.border;
+          wrapper.style.borderWidth = computedStyle.borderWidth;
+          wrapper.style.borderStyle = computedStyle.borderStyle;
+          wrapper.style.borderColor = computedStyle.borderColor;
+          wrapper.style.padding = computedStyle.padding;
+          wrapper.style.backgroundColor = computedStyle.backgroundColor;
+          wrapper.style.fontFamily = computedStyle.fontFamily;
+          wrapper.style.fontSize = computedStyle.fontSize;
+          wrapper.style.lineHeight = computedStyle.lineHeight;
+          wrapper.style.color = computedStyle.color;
+          
+          // 複製內部 HTML
+          wrapper.innerHTML = frame.innerHTML;
+          
+          // 處理所有圖片
+          const images = wrapper.querySelectorAll('img');
+          images.forEach((img, imgIndex) => {
+            const originalImg = frame.querySelectorAll('img')[imgIndex];
+            if (originalImg) {
+              // 複製計算後的樣式
+              const imgStyle = window.getComputedStyle(originalImg);
+              img.style.width = imgStyle.width;
+              img.style.height = imgStyle.height;
+              img.style.display = imgStyle.display;
+              
+              // 確保 src 是完整 URL
+              if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('http')) {
+                img.src = new URL(img.src, window.location.href).href;
+              }
             }
           });
           
-          // 建立完整的 HTML 文檔
-          const fullHtml = `
-            ${doctypeString}
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <style>
-                body {
-                  margin: 0;
-                  padding: 0;
-                  background: white;
-                }
-                ${allStyles}
-              </style>
-            </head>
-            <body>
-              ${frameClone.outerHTML}
-            </body>
-            </html>
-          `;
+          // 處理所有的內部元素樣式
+          const allElements = wrapper.querySelectorAll('*');
+          const originalElements = frame.querySelectorAll('*');
+          
+          allElements.forEach((el, elIndex) => {
+            if (originalElements[elIndex]) {
+              const originalStyle = window.getComputedStyle(originalElements[elIndex]);
+              // 複製重要的樣式屬性
+              el.style.margin = originalStyle.margin;
+              el.style.padding = originalStyle.padding;
+              el.style.fontSize = originalStyle.fontSize;
+              el.style.fontWeight = originalStyle.fontWeight;
+              el.style.textAlign = originalStyle.textAlign;
+              el.style.lineHeight = originalStyle.lineHeight;
+              el.style.display = originalStyle.display;
+              el.style.position = originalStyle.position;
+              el.style.top = originalStyle.top;
+              el.style.left = originalStyle.left;
+              el.style.right = originalStyle.right;
+              el.style.bottom = originalStyle.bottom;
+            }
+          });
           
           // 提取資訊
           let orderNo = '';
           let serviceCode = '';
-          const text = frameClone.textContent || '';
+          const text = wrapper.textContent || '';
           
           const orderMatch = text.match(/(?:寄件)?訂單編號[：:]\s*(\d+)/);
           if (orderMatch) {
             orderNo = orderMatch[1];
           }
           
-          const serviceCodeElement = frameClone.querySelector('span[id*="lblC2BPinCode"]');
+          const serviceCodeElement = wrapper.querySelector('span[id*="lblC2BPinCode"]');
           if (serviceCodeElement) {
             serviceCode = serviceCodeElement.textContent.trim();
           } else {
@@ -285,10 +268,11 @@
           console.log(`物流單 ${index + 1} - 訂單編號: ${orderNo || '未找到'}, 服務代碼: ${serviceCode || '未找到'}`);
           
           shippingData.push({
-            html: frameClone.outerHTML,
-            fullHtml: fullHtml,
+            html: wrapper.outerHTML,
             orderNo: orderNo,
             serviceCode: serviceCode,
+            width: computedStyle.width,
+            height: computedStyle.height,
             index: index
           });
         } catch (error) {
@@ -299,7 +283,7 @@
     
     saveShippingData();
   }
-  
+
   function saveShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
     
@@ -1146,7 +1130,6 @@
     pages.forEach(page => container.appendChild(page));
   }
   
-  // 修正 generatePages 函數中的配對邏輯
   function generatePages(printOrder, settings) {
     const pages = [];
     let pageOrder = [];
@@ -1244,15 +1227,13 @@
     return pages;
   }
   
-  // 修正生成物流單頁面 - 保持原始格式
+  // 簡化的生成物流單頁面
   function generateShippingPage(data, settings, customOrderNo) {
     if (!data) return '';
     
     const displayOrderNo = customOrderNo || data.orderNo;
-    const uniqueId = `shipping-frame-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // 創建頁面結構
-    const pageHtml = `
+    return `
       <div class="bv-shipping-content" style="
         width: ${settings.paper.width}mm;
         height: ${settings.paper.height}mm;
@@ -1284,11 +1265,8 @@
                ">
         ` : ''}
         
-        <!-- iframe 容器 -->
-        <div id="${uniqueId}" style="
-          z-index: 2;
-          position: relative;
-        ">
+        <!-- 物流單內容 -->
+        <div style="z-index: 2; position: relative;">
           ${data.html}
         </div>
         
@@ -1317,10 +1295,7 @@
         ` : ''}
       </div>
     `;
-    
-    return pageHtml;
   }
-
   
   function generateDetailPage(data, settings) {
     if (!data || !data.orderInfo) return '';
@@ -1353,8 +1328,11 @@
                  transform: translate(-50%, -50%);
                  width: ${settings.detail.logoSize}mm;
                  opacity: ${settings.detail.logoOpacity / 100};
+                 --opacity: ${settings.detail.logoOpacity / 100};
                  pointer-events: none;
                  z-index: 1;
+                 -webkit-print-color-adjust: exact;
+                 print-color-adjust: exact;
                ">
         ` : ''}
         
@@ -1384,6 +1362,8 @@
               <p style="margin: 2px 0;"><strong>電話：</strong>${fields.hideInfo ? maskPhone(info.recipientPhone) : info.recipientPhone}</p>
               <p style="margin: 2px 0;"><strong>地址：</strong>${info.address}</p>
               ${info.storeName ? `<p style="margin: 2px 0;"><strong>門市：</strong>${info.storeName}</p>` : ''}
+              ${fields.deliveryTime && info.deliveryTime ? `<p style="margin: 2px 0;"><strong>指定配送時段：</strong>${info.deliveryTime}</p>` : ''}
+              ${fields.shippingTime && info.shippingTime ? `<p style="margin: 2px 0;"><strong>預計出貨日：</strong>${info.shippingTime}</p>` : ''}
             </div>
           </div>
           
@@ -1428,6 +1408,12 @@
             </div>
           ` : ''}
           
+          ${fields.manageRemark && info.manageRemark ? `
+            <div style="margin-top: 4px; padding: 4px; background: #f5f5f5; font-size: 12px;">
+              <strong>後台備註：</strong>${info.manageRemark}
+            </div>
+          ` : ''}
+          
           ${fields.printRemark && info.printRemark ? `
             <div style="margin-top: 4px; padding: 4px; background: #f5f5f5; font-size: 12px;">
               <strong>列印備註：</strong>${info.printRemark}
@@ -1436,146 +1422,6 @@
         </div>
       </div>
     `;
-  }
-  
-  // 同樣修正 generateDetailPage 函數
-  function generateDetailPage(data, settings) {
-    if (!data || !data.orderInfo) return '';
-    
-    const fields = getFieldSettings();
-    const info = data.orderInfo;
-    
-    let html = `
-      <div class="bv-detail-content" style="
-        width: 100mm;
-        height: 150mm;
-        position: relative;
-        overflow: visible;
-        padding: ${settings.paper.margin}mm;
-        font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
-        font-size: ${settings.detail.textSize};
-        box-sizing: border-box;
-        background: white;
-        margin: 0;
-      ">
-        <!-- 底圖（最底層） -->
-        ${settings.detail.logo ? `
-          <img src="${settings.detail.logo}" 
-               class="bv-watermark-logo"
-               style="
-                 position: absolute;
-                 top: ${settings.detail.logoY}%;
-                 left: ${settings.detail.logoX}%;
-                 transform: translate(-50%, -50%);
-                 width: ${settings.detail.logoSize}mm;
-                 opacity: ${settings.detail.logoOpacity / 100};
-                 --opacity: ${settings.detail.logoOpacity / 100};
-                 pointer-events: none;
-                 z-index: 1;
-                 -webkit-print-color-adjust: exact;
-                 print-color-adjust: exact;
-               ">
-        ` : ''}
-        
-        <!-- 明細內容（上層） -->
-        <div style="
-          transform: scale(${settings.paper.scale / 100});
-          transform-origin: top center;
-          width: 100%;
-          position: relative;
-          z-index: 2;
-        ">
-          <h2 style="text-align: center; margin: 0 0 10px 0; font-size: 20px;">出貨明細</h2>
-          
-          <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: ${settings.detail.textSize};">
-            <div style="flex: 1; padding-right: 10px;">
-              <p style="margin: 2px 0;"><strong>訂單編號：</strong>${info.orderNo}</p>
-              <p style="margin: 2px 0;"><strong>訂購日期：</strong>${info.orderDate}</p>
-              <p style="margin: 2px 0;"><strong>訂購人：</strong>${fields.hideInfo ? maskName(info.customer) : info.customer}</p>
-              <p style="margin: 2px 0;"><strong>訂購人帳號：</strong>${info.customerAccount}</p>
-              <p style="margin: 2px 0;"><strong>聯絡電話：</strong>${fields.hideInfo ? maskPhone(info.phone) : info.phone}</p>
-              ${fields.showLogTraceId && data.logTraceId ? `<p style="margin: 2px 0;"><strong>物流編號：</strong>${data.logTraceId}</p>` : ''}
-            </div>
-            <div style="flex: 1;">
-              <p style="margin: 2px 0;"><strong>付款方式：</strong>${info.paymentMethod}</p>
-              <p style="margin: 2px 0;"><strong>送貨方式：</strong>${info.shippingMethod}</p>
-              <p style="margin: 2px 0;"><strong>收件人：</strong>${fields.hideInfo ? maskName(info.recipient) : info.recipient}</p>
-              <p style="margin: 2px 0;"><strong>收件人電話：</strong>${fields.hideInfo ? maskPhone(info.recipientPhone) : info.recipientPhone}</p>
-              <p style="margin: 2px 0;"><strong>送貨地址：</strong>${info.address}</p>
-              ${info.storeName ? `<p style="margin: 2px 0;"><strong>門市名稱：</strong>${info.storeName}</p>` : ''}
-              ${fields.deliveryTime && info.deliveryTime ? `<p style="margin: 2px 0;"><strong>指定配送時段：</strong>${info.deliveryTime}</p>` : ''}
-              ${fields.shippingTime && info.shippingTime ? `<p style="margin: 2px 0;"><strong>預計出貨日：</strong>${info.shippingTime}</p>` : ''}
-            </div>
-          </div>
-          
-          <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: ${settings.detail.textSize};">
-            <thead>
-              <tr style="border-top: 2px solid black; border-bottom: 2px solid black;">
-                <th style="text-align: left; padding: 4px;">品名</th>
-                ${!fields.hidePrice ? '<th style="text-align: right; padding: 4px;">單價</th>' : ''}
-                <th style="text-align: center; padding: 4px;">數量</th>
-                ${!fields.hidePrice ? '<th style="text-align: right; padding: 4px;">小計</th>' : ''}
-              </tr>
-            </thead>
-            <tbody>
-              ${info.items.map(item => `
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 4px;">
-                    ${fields.productImage && item.image ? `<img src="${item.image}" style="width: 30px; height: 30px; object-fit: cover; vertical-align: middle; margin-right: 4px;">` : ''}
-                    ${item.name}
-                  </td>
-                  ${!fields.hidePrice ? `<td style="text-align: right; padding: 4px;">${item.price}</td>` : ''}
-                  <td style="text-align: center; padding: 4px;">${item.qty}</td>
-                  ${!fields.hidePrice ? `<td style="text-align: right; padding: 4px;">${item.subtotal}</td>` : ''}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          ${!fields.hidePrice ? `
-            <table style="width: 100%; border-top: 1px solid black; border-bottom: 1px solid black; margin-top: 10px; font-size: ${settings.detail.textSize};">
-              <tr>
-                <td style="text-align: right; padding: 4px;">商品總數量：</td>
-                <td style="text-align: right; padding: 4px; width: 100px;">${info.totalQty}</td>
-              </tr>
-              ${info.extraShipping ? `
-                <tr>
-                  <td style="text-align: right; padding: 4px;">額外運費：</td>
-                  <td style="text-align: right; padding: 4px;">${info.extraShipping}</td>
-                </tr>
-              ` : ''}
-              <tr>
-                <td style="text-align: right; padding: 4px; font-weight: bold;">總計：</td>
-                <td style="text-align: right; padding: 4px; font-weight: bold;">${info.total}</td>
-              </tr>
-            </table>
-          ` : ''}
-          
-          ${fields.remark && info.remark ? `
-            <div style="margin-top: 10px; padding: 6px; background: #f5f5f5; border-radius: 4px;">
-              <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">顧客備註</div>
-              <div style="font-size: ${settings.detail.textSize};">${info.remark}</div>
-            </div>
-          ` : ''}
-          
-          ${fields.manageRemark && info.manageRemark ? `
-            <div style="margin-top: 6px; padding: 6px; background: #f5f5f5; border-radius: 4px;">
-              <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">後台備註</div>
-              <div style="font-size: ${settings.detail.textSize};">${info.manageRemark}</div>
-            </div>
-          ` : ''}
-          
-          ${fields.printRemark && info.printRemark ? `
-            <div style="margin-top: 6px; padding: 6px; background: #f5f5f5; border-radius: 4px;">
-              <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">列印備註</div>
-              <div style="font-size: ${settings.detail.textSize};">${info.printRemark}</div>
-            </div>
-          ` : ''}
-        </div>
-      </div>
-    `;
-    
-    return html;
   }
   
   // 遮罩函數
@@ -1592,6 +1438,7 @@
     return phone.substring(0, 4) + '***' + phone.substring(phone.length - 3);
   }
   
+  // 使用 Chrome 列印 API 的處理方式
   function handlePrint() {
     const settings = getSettings();
     const printOrder = document.getElementById('bv-print-order').value;
@@ -1602,133 +1449,79 @@
       return;
     }
     
-    // 創建一個新的列印視窗
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    // 添加列印專用樣式
+    let printStyleElement = document.getElementById('bv-print-specific-styles');
+    if (!printStyleElement) {
+      printStyleElement = document.createElement('style');
+      printStyleElement.id = 'bv-print-specific-styles';
+      document.head.appendChild(printStyleElement);
+    }
     
-    // 建立列印文檔
-    const printDoc = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>列印 - BV SHOP 出貨助手</title>
-        <style>
-          @page {
-            size: 100mm 150mm;
-            margin: 0;
-          }
-          
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          
-          body {
-            margin: 0;
-            padding: 0;
-            background: white;
-          }
-          
-          .print-page {
-            width: 100mm;
-            height: 150mm;
-            position: relative;
-            page-break-after: always;
-            page-break-inside: avoid;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-          }
-          
-          .print-page:last-child {
-            page-break-after: auto;
-          }
-          
-          .bv-shipping-content,
-          .bv-detail-content {
-            width: 100mm;
-            height: 150mm;
-            position: relative;
-            margin: 0;
-            padding: 0;
-          }
-          
-          .bv-watermark-logo {
-            position: absolute;
-            pointer-events: none;
-          }
-          
-          @media screen {
-            body {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              padding: 20px;
-              background: #f0f0f0;
-            }
-            
-            .print-page {
-              background: white;
-              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-              margin-bottom: 20px;
-            }
-          }
-        </style>
-        ${getDetailStyles()}
-      </head>
-      <body>
-        ${pages.map(page => `<div class="print-page">${page.innerHTML}</div>`).join('')}
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-              setTimeout(function() {
-                window.close();
-              }, 1000);
-            }, 500);
-          };
-        </script>
-      </body>
-      </html>
+    printStyleElement.textContent = `
+      @media print {
+        /* 重置所有邊距 */
+        * {
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        
+        @page {
+          size: 100mm 150mm;
+          margin: 0;
+        }
+        
+        html, body {
+          width: 100mm !important;
+          height: 100% !important;
+          overflow: visible !important;
+        }
+        
+        /* 隱藏非列印元素 */
+        #bv-shipping-assistant-panel,
+        #bv-shipping-panel,
+        .bv-notification,
+        .ignore-print,
+        body > *:not(#bv-preview-container) {
+          display: none !important;
+        }
+        
+        #bv-preview-container {
+          display: block !important;
+          width: 100mm !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        
+        .bv-preview-page {
+          width: 100mm !important;
+          height: 150mm !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          page-break-after: always !important;
+          position: relative !important;
+        }
+        
+        .bv-preview-page:last-child {
+          page-break-after: auto !important;
+        }
+        
+        /* 保持物流單原始樣式 */
+        .bv-shipping-wrapper {
+          margin: 0 auto !important;
+        }
+        
+        /* 確保圖片顯示 */
+        img {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+      }
     `;
     
-    printWindow.document.write(printDoc);
-    printWindow.document.close();
-  }
-  
-  // 獲取明細頁面的樣式
-  function getDetailStyles() {
-    return `
-      <style>
-        /* 明細頁面樣式 */
-        .bv-detail-content {
-          font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
-          box-sizing: border-box;
-        }
-        
-        .bv-detail-content table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        
-        .bv-detail-content th,
-        .bv-detail-content td {
-          padding: 4px;
-          text-align: left;
-        }
-        
-        .bv-detail-content th {
-          border-top: 2px solid black;
-          border-bottom: 2px solid black;
-        }
-        
-        .bv-detail-content td {
-          border-bottom: 1px solid #ddd;
-        }
-        
-        /* 其他必要的樣式 */
-      </style>
-    `;
+    // 延遲執行列印，確保樣式已套用
+    setTimeout(() => {
+      window.print();
+    }, 100);
   }
   
   // 工具函數
@@ -2318,7 +2111,7 @@
   
   // === 主程式執行 ===
   
-  // 在初始化前檢查
+  // 根據頁面類型自動執行對應的初始化
   if (currentPage.type === 'shipping') {
     // 物流單頁自動顯示面板
     if (document.readyState === 'loading') {
@@ -2335,6 +2128,21 @@
   } else if (currentPage.type === 'detail') {
     // 明細頁等待使用者啟動
     console.log('BV SHOP 出貨明細頁面已偵測，點擊擴充功能圖示以啟動');
+    
+    // 自動抓取明細資料（使用者啟動面板後）
+    const observer = new MutationObserver((mutations) => {
+      if (panelActive && document.querySelector('.order-content')) {
+        fetchDetailData();
+        observer.disconnect();
+      }
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
   
 })();
+
+    
