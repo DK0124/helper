@@ -1,4 +1,4 @@
-/* BV SHOP 出貨助手 - 樣式表 (完整重構版) */
+/* BV SHOP 出貨助手 - 樣式表 (完整重構版 with Mac print fix) */
 
 /* 載入字體 */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
@@ -861,26 +861,23 @@
   }
 }
 
-/* 列印樣式 - 修正列印時的版面問題 */
+/* 列印樣式 - 修正列印時的版面問題（加強Mac Chrome支援） */
 @media print {
-  img, svg {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    display: block !important;
-    filter: none !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    background: none !important;
-    max-width: 100% !important;
-    max-height: 100% !important;
+  /* 隱藏所有控制面板元素 */
+  #bv-shipping-assistant-panel,
+  #bv-shipping-panel,
+  .bv-notification,
+  .ignore-print {
+    display: none !important;
   }
-}
   
   /* 重置所有元素的基本樣式 */
   * {
     margin: 0 !important;
     padding: 0 !important;
     box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   
   /* 重置body樣式 */
@@ -950,18 +947,40 @@
     box-sizing: border-box !important;
   }
   
-  /* 確保圖片在列印時顯示 */
-  img {
+  /* 確保圖片在列印時顯示（Mac Chrome 專用修正） */
+  img, svg {
     max-width: 100% !important;
     height: auto !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    filter: none !important;
+    box-shadow: none !important;
+    background: none !important;
+    overflow: visible !important;
+    page-break-inside: avoid !important;
+    transform: none !important;
+    position: relative !important;
+  }
+  
+  /* 確保所有內容元素都正確顯示 */
+  div, span, p, h1, h2, h3, h4, h5, h6, table, tr, td, th {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    overflow: visible !important;
   }
   
   /* 確保背景色在列印時顯示 */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
   
   /* 設定頁面大小和邊距 */
@@ -973,6 +992,19 @@
   /* 隱藏頁面上的其他元素 */
   body > *:not(#bv-preview-container) {
     display: none !important;
+  }
+  
+  /* 確保 QR Code 圖片正確顯示 */
+  img[src*="QRCode"],
+  img[src*="qrcode"],
+  img[src*="barcode"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 
