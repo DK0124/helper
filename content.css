@@ -861,7 +861,7 @@
   }
 }
 
-/* 列印樣式 - 修正列印時的版面問題（加強Mac Chrome支援） */
+/* 列印樣式 - 專門針對 7-11 物流單優化 */
 @media print {
   /* 隱藏所有控制面板元素 */
   #bv-shipping-assistant-panel,
@@ -871,16 +871,14 @@
     display: none !important;
   }
   
-  /* 重置所有元素的基本樣式 */
+  /* 重置基本樣式 */
   * {
-    margin: 0 !important;
-    padding: 0 !important;
-    box-sizing: border-box !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
   
-  /* 重置body樣式 */
+  /* 重置 body 樣式 */
   html, body {
     margin: 0 !important;
     padding: 0 !important;
@@ -903,8 +901,10 @@
   .bv-print-page {
     page-break-after: always !important;
     page-break-inside: avoid !important;
+    break-after: page !important;
+    break-inside: avoid !important;
     box-shadow: none !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     position: relative !important;
     display: block !important;
@@ -928,13 +928,13 @@
     overflow: hidden !important;
   }
   
-  /* 物流單內部的 div_frame 樣式調整 */
-  .bv-shipping-content .div_frame {
-    transform-origin: top left !important;
-    position: absolute !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
+  /* 保持物流單原始結構 */
+  .div_frame {
+    width: 300px !important;
+    height: 450px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: relative !important;
   }
   
   /* 明細內容列印樣式 */
@@ -947,40 +947,48 @@
     box-sizing: border-box !important;
   }
   
-  /* 確保圖片在列印時顯示（Mac Chrome 專用修正） */
-  img, svg {
+  /* 確保所有圖片都顯示 */
+  img {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
     max-width: 100% !important;
     height: auto !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* 特別確保 QR Code 圖片顯示 */
+  img[src*="QRCode"],
+  img[src*="qrcode"],
+  img[src*="barcode"],
+  img[src*=".ashx"] {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
     filter: none !important;
-    box-shadow: none !important;
-    background: none !important;
-    overflow: visible !important;
-    page-break-inside: avoid !important;
     transform: none !important;
-    position: relative !important;
+    -webkit-filter: none !important;
+    -webkit-transform: none !important;
+    image-rendering: -webkit-optimize-contrast !important;
+    image-rendering: crisp-edges !important;
   }
   
-  /* 確保所有內容元素都正確顯示 */
-  div, span, p, h1, h2, h3, h4, h5, h6, table, tr, td, th {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  /* 確保表格和文字正確顯示 */
+  table, tr, td, th, div, span, p {
     visibility: visible !important;
     opacity: 1 !important;
-    filter: none !important;
-    transform: none !important;
-    overflow: visible !important;
+    display: table !important;
   }
   
-  /* 確保背景色在列印時顯示 */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
+  td, th {
+    display: table-cell !important;
+  }
+  
+  tr {
+    display: table-row !important;
   }
   
   /* 設定頁面大小和邊距 */
@@ -993,32 +1001,16 @@
   body > *:not(#bv-preview-container) {
     display: none !important;
   }
-  
-  /* 確保 QR Code 圖片正確顯示 */
-  img[src*="QRCode"],
-  img[src*="qrcode"],
-  img[src*="barcode"] {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    filter: none !important;
-    transform: none !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
 }
 
-/* 響應式設計 */
-@media (max-width: 768px) {
-  #bv-shipping-assistant-panel {
-    width: 100%;
-    right: 0;
-    top: 0;
-    max-height: 100vh;
-    border-radius: 0;
+/* Mac Chrome 特別優化 */
+@media print and (-webkit-min-device-pixel-ratio: 0) {
+  img {
+    image-rendering: auto !important;
+    -webkit-print-color-adjust: exact !important;
   }
   
-  .bv-field-list {
-    grid-template-columns: 1fr;
+  .bv-shipping-content img {
+    will-change: transform !important;
   }
 }
