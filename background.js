@@ -1,140 +1,186 @@
-// BV SHOP 出貨助手 - 背景腳本 (Service Worker 版本)
+// BV SHOP 出貨助手 - 背景腳本 (2025 優化版)
 
-// 監聽擴充功能圖示點擊
-chrome.action.onClicked.addListener((tab) => {
+// 定義支援的網站列表
+const SUPPORTED_HOSTS = [
+  'myship.7-11.com.tw',
+  'epayment.7-11.com.tw',
+  'eship.7-11.com.tw',
+  'family.com.tw',
+  'famiport.com.tw',
+  'hilife.com.tw',
+  'okmart.com.tw',
+  'bvshop'
+];
+
+// 物流單網站列表（需要自動注入）
+const SHIPPING_HOSTS = [
+  'myship.7-11.com.tw',
+  'epayment.7-11.com.tw',
+  'eship.7-11.com.tw',
+  'family.com.tw',
+  'famiport.com.tw',
+  'hilife.com.tw',
+  'okmart.com.tw'
+];
+
+// 檢查 URL 是否為支援的網站
+function isSupportedUrl(url) {
+  if (!url) return false;
+  return SUPPORTED_HOSTS.some(host => url.includes(host));
+}
+
+// 檢查是否為物流單網站
+function isShippingUrl(url) {
+  if (!url) return false;
+  return SHIPPING_HOSTS.some(host => url.includes(host));
+}
+
+// 安全地發送訊息到 content script
+async function sendMessageToTab(tabId, message) {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, message);
+    return response;
+  } catch (error) {
+    console.log('訊息發送失敗，可能需要注入 content script');
+    return null;
+  }
+}
+
+// 注入 content script 和 CSS
+async function injectContentScript(tabId) {
+  try {
+    // 先注入 CSS
+    await chrome.scripting.insertCSS({
+      target: { tabId: tabId },
+      files: ['content.css']
+    });
+    
+    // 再注入 JavaScript
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      files: ['content.js']
+    });
+    
+    // 等待 content script 初始化
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    return true;
+  } catch (error) {
+    console.error('注入腳本時發生錯誤:', error.message);
+    return false;
+  }
+}
+
+// 處理擴充功能圖示點擊
+chrome.action.onClicked.addListener(async (tab) => {
   // 檢查是否為支援的頁面
-  const supportedUrls = [
-    'myship.7-11.com.tw',
-    'epayment.7-11.com.tw',
-    'eship.7-11.com.tw',
-    'family.com.tw',
-    'famiport.com.tw',
-    'hilife.com.tw',
-    'okmart.com.tw',
-    'bvshop'
-  ];
+  if (!isSupportedUrl(tab.url)) {
+    console.log('不支援的網站:', tab.url);
+    // 可以在這裡顯示提示，但不使用 notifications API
+    return;
+  }
   
-  const isSupported = supportedUrls.some(url => tab.url && tab.url.includes(url));
+  // 先嘗試發送 ping 訊息
+  const pingResponse = await sendMessageToTab(tab.id, { action: 'ping' });
   
-  if (isSupported) {
-    // 先檢查 content script 是否已經注入
-    chrome.tabs.sendMessage(tab.id, { action: 'ping' }, (response) => {
-      if (chrome.runtime.lastError) {
-        // Content script 尚未載入，先注入
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['content.js']
-        }, () => {
-          if (chrome.runtime.lastError) {
-            console.error('無法注入 content script:', chrome.runtime.lastError);
-            return;
-          }
-          
-          // 注入 CSS
-          chrome.scripting.insertCSS({
-            target: { tabId: tab.id },
-            files: ['content.css']
-          }, () => {
-            if (chrome.runtime.lastError) {
-              console.error('無法注入 CSS:', chrome.runtime.lastError);
-              return;
-            }
-            
-            // 稍等一下讓 content script 初始化
-            setTimeout(() => {
-              // 現在發送訊息
-              chrome.tabs.sendMessage(tab.id, { action: 'togglePanel' }, (response) => {
-                if (chrome.runtime.lastError) {
-                  console.error('無法與內容腳本通訊:', chrome.runtime.lastError);
-                }
-              });
-            }, 100);
-          });
-        });
-      } else {
-        // Content script 已經存在，直接發送訊息
-        chrome.tabs.sendMessage(tab.id, { action: 'togglePanel' }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.error('發送訊息失敗:', chrome.runtime.lastError);
-          }
-        });
+  if (!pingResponse) {
+    // Content script 未載入，需要注入
+    console.log('正在注入 content script...');
+    const injected = await injectContentScript(tab.id);
+    
+    if (!injected) {
+      console.error('無法注入 content script');
+      return;
+    }
+  }
+  
+  // 發送切換面板的訊息
+  const toggleResponse = await sendMessageToTab(tab.id, { action: 'togglePanel' });
+  
+  if (!toggleResponse) {
+    console.error('無法與 content script 通訊');
+  }
+});
+
+// 監聽擴充功能安裝或更新
+chrome.runtime.onInstalled.addListener((details) => {
+  console.log('BV SHOP 出貨助手已安裝/更新', details.reason);
+  
+  // 如果是更新，可能需要重新注入 content scripts
+  if (details.reason === 'update') {
+    // 獲取所有標籤頁
+    chrome.tabs.query({}, async (tabs) => {
+      for (const tab of tabs) {
+        if (isSupportedUrl(tab.url) && isShippingUrl(tab.url)) {
+          // 嘗試為物流單頁面重新注入
+          await injectContentScript(tab.id);
+        }
       }
     });
-  } else {
-    // 不支援的頁面，簡單提示
-    console.log('此頁面不支援 BV SHOP 出貨助手');
   }
 });
 
-// 監聽安裝事件
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('BV SHOP 出貨助手已安裝');
-});
-
-// 監聽來自 content script 的訊息
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'contentScriptReady') {
-    console.log('Content script 已準備就緒:', sender.tab?.url);
-    sendResponse({ status: 'acknowledged' });
-  }
-  return true;
-});
-
-// 監聽標籤更新事件
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
-    // 檢查是否為支援的網站
-    const supportedUrls = [
-      'myship.7-11.com.tw',
-      'epayment.7-11.com.tw', 
-      'eship.7-11.com.tw',
-      'family.com.tw',
-      'famiport.com.tw',
-      'hilife.com.tw',
-      'okmart.com.tw',
-      'bvshop'
-    ];
+// 監聽標籤頁更新
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // 只在頁面完全載入時處理
+  if (changeInfo.status !== 'complete') return;
+  
+  // 檢查是否為支援的網站
+  if (!isSupportedUrl(tab.url)) return;
+  
+  // 如果是物流單網站，自動注入 content script
+  if (isShippingUrl(tab.url)) {
+    console.log('偵測到物流單頁面，準備自動注入...');
     
-    const isSupported = supportedUrls.some(url => tab.url.includes(url));
+    // 先檢查是否已經有 content script
+    const pingResponse = await sendMessageToTab(tabId, { action: 'ping' });
     
-    if (isSupported) {
-      // 檢查是否需要自動注入 content script（針對物流單頁面）
-      const shippingUrls = [
-        'myship.7-11.com.tw',
-        'epayment.7-11.com.tw',
-        'eship.7-11.com.tw',
-        'family.com.tw',
-        'famiport.com.tw',
-        'hilife.com.tw',
-        'okmart.com.tw'
-      ];
-      
-      const isShippingPage = shippingUrls.some(url => tab.url.includes(url));
-      
-      if (isShippingPage) {
-        // 物流單頁面自動注入
-        chrome.tabs.sendMessage(tabId, { action: 'ping' }, (response) => {
-          if (chrome.runtime.lastError) {
-            // Content script 尚未載入，注入它
-            chrome.scripting.executeScript({
-              target: { tabId: tabId },
-              files: ['content.js']
-            }, () => {
-              if (!chrome.runtime.lastError) {
-                chrome.scripting.insertCSS({
-                  target: { tabId: tabId },
-                  files: ['content.css']
-                });
-              }
-            });
-          }
-        });
-      }
+    if (!pingResponse) {
+      // 需要注入
+      await injectContentScript(tabId);
     }
   }
 });
 
-// 處理擴充功能更新或重新載入的情況
-chrome.runtime.onStartup.addListener(() => {
-  console.log('BV SHOP 出貨助手已啟動');
+// 監聽來自 content script 的訊息
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('收到訊息:', request.action, '來自:', sender.tab?.url);
+  
+  switch (request.action) {
+    case 'contentScriptReady':
+      console.log('Content script 已就緒');
+      sendResponse({ status: 'acknowledged' });
+      break;
+      
+    case 'getTabInfo':
+      sendResponse({ 
+        tabId: sender.tab?.id,
+        url: sender.tab?.url 
+      });
+      break;
+      
+    default:
+      sendResponse({ status: 'unknown action' });
+  }
+  
+  // 保持訊息通道開啟
+  return true;
 });
+
+// Service Worker 啟動時執行
+chrome.runtime.onStartup.addListener(() => {
+  console.log('BV SHOP 出貨助手 Service Worker 已啟動');
+});
+
+// 處理 Service Worker 的生命週期
+self.addEventListener('activate', event => {
+  console.log('Service Worker 已啟動');
+});
+
+// 確保 Service Worker 保持活躍（Chrome 110+ 不需要這個）
+// 如果你的 Chrome 版本較舊，可以取消註解以下程式碼
+/*
+const keepAlive = () => setInterval(chrome.runtime.getPlatformInfo, 20e3);
+chrome.runtime.onStartup.addListener(keepAlive);
+keepAlive();
+*/
