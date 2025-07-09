@@ -189,58 +189,84 @@
     btn.disabled = true;
     btn.innerHTML = '抓取中...';
     
-    // 重新抓取，清空舊資料
     shippingData = [];
     
     if (currentPage.provider === 'seven') {
-      // 7-11 物流單抓取 - 更精確的選擇器
-      const frames = [];
+      // 使用舊版的抓取邏輯
+      const tables = document.querySelectorAll('table');
+      const shippingTables = [];
       
-      // 找到所有的物流單框架
-      document.querySelectorAll('.div_frame').forEach(frame => {
-        // 確保是物流單內容
-        if (frame.querySelector('img[src*="SendQRCode.ashx"]') || 
-            frame.querySelector('img[src*="QRCode.ashx"]')) {
-          frames.push(frame);
+      // 找出包含物流單的表格
+      tables.forEach(table => {
+        const text = table.textContent;
+        const hasShippingKeywords = text.includes('交貨便') || 
+                                   text.includes('統一超商') ||
+                                   text.includes('7-11') ||
+                                   text.includes('寄件編號') ||
+                                   text.includes('E927'); // 物流單編號特徵
+        
+        if (hasShippingKeywords) {
+          // 檢查是否為獨立的物流單表格
+          const parentTd = table.closest('td[style*="border"]');
+          if (parentTd) {
+            // 確保不重複添加
+            if (!shippingTables.includes(parentTd)) {
+              shippingTables.push(parentTd);
+            }
+          } else {
+            // 如果沒有找到 td，可能整個 table 就是物流單
+            shippingTables.push(table);
+          }
         }
       });
       
-      console.log('找到的物流單框架數量:', frames.length);
+      // 如果沒找到，嘗試用 div_frame
+      if (shippingTables.length === 0) {
+        document.querySelectorAll('.div_frame').forEach(frame => {
+          if (frame.textContent.includes('交貨便') && frame.textContent.includes('統一超商')) {
+            shippingTables.push(frame);
+          }
+        });
+      }
       
-      // 處理每個框架
-      for (let index = 0; index < frames.length; index++) {
-        const frame = frames[index];
+      console.log('找到的物流單數量:', shippingTables.length);
+      
+      // 處理每個物流單
+      for (let index = 0; index < shippingTables.length; index++) {
+        const element = shippingTables[index];
+        const clone = element.cloneNode(true);
         
-        // 確保框架有內容
-        if (!frame || frame.innerHTML.trim() === '') {
-          console.log('跳過空白框架:', index);
-          continue;
+        // 簡單處理圖片 URL，不做 base64 轉換
+        clone.querySelectorAll('img').forEach(img => {
+          if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('http')) {
+            img.src = new URL(img.src, window.location.href).href;
+          }
+        });
+        
+        // 找訂單編號
+        let orderNo = '';
+        const text = clone.textContent;
+        // 尋找各種可能的訂單編號格式
+        const orderMatch = text.match(/訂單[編號]*[:：]?\s*(\w+)/) || 
+                          text.match(/寄件訂單編號[:：]?\s*(\d+)/) ||
+                          text.match(/寄件編號[:：]?\s*(\w+)/) ||
+                          text.match(/(\d{8,})/); // 8位以上數字
+        if (orderMatch) {
+          orderNo = orderMatch[1] || orderMatch[0];
         }
         
-        // 創建包裝容器，保持原始尺寸
-        const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'width: 300px; height: 450px; position: relative; margin: 0 auto;';
-        
-        const clone = frame.cloneNode(true);
-        
-        // 處理圖片轉為 base64
-        await processImagesToBase64(clone);
-        
-        // 將複製的內容放入包裝容器
-        wrapper.appendChild(clone);
-        
-        // 只加入有實際內容的物流單
-        const htmlContent = wrapper.outerHTML;
-        if (htmlContent && htmlContent.length > 100) {
+        // 確保有實際內容
+        if (clone.textContent.trim().length > 50) {
           shippingData.push({
-            html: htmlContent,
+            html: clone.outerHTML,
+            orderNo: orderNo,
             index: index
           });
         }
       }
     }
     
-    // 儲存資料時加入時間戳記
+    // 儲存資料
     if (chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({ 
         bvShippingData: shippingData,
@@ -260,6 +286,7 @@
       });
     }
   }
+
   
   // === 明細頁面專用函數 ===
   
@@ -1066,71 +1093,55 @@
         position: relative;
         overflow: hidden;
         background: white;
-        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         margin: 0;
         padding: 0;
       ">
-        <!-- Logo 底圖層 -->
-        ${settings.shipping.logo ? `
-          <div style="
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 1;
-            pointer-events: none;
-          ">
-            <img src="${settings.shipping.logo}" style="
-              position: absolute;
-              top: ${settings.shipping.logoY}%;
-              left: ${settings.shipping.logoX}%;
-              transform: translate(-50%, -50%);
-              width: ${settings.shipping.logoSize}mm;
-              opacity: ${settings.shipping.logoOpacity / 100};
-            ">
-          </div>
-        ` : ''}
-        
-        <!-- 主要內容層 -->
+        <!-- 物流單內容 (最底層) -->
         <div style="
           position: relative;
-          width: 100%;
-          height: 100%;
-          z-index: 2;
+          transform: scale(${settings.paper.scale / 100});
+          transform-origin: center center;
+          z-index: 1;
         ">
-          <!-- 訂單編號標籤 -->
-          ${settings.showOrderNumber && orderNo ? `
-            <div style="
-              position: absolute;
-              top: ${settings.orderLabelTop}mm;
-              left: 50%;
-              transform: translateX(-50%);
-              background: white;
-              padding: 4px 12px;
-              border: 1px solid #333;
-              border-radius: 4px;
-              font-size: ${settings.orderLabelSize}px;
-              font-weight: bold;
-              z-index: 10;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-              white-space: nowrap;
-            ">
-              訂單編號：${orderNo}
-            </div>
-          ` : ''}
-          
-          <!-- 物流單內容 -->
+          ${data.html}
+        </div>
+        
+        <!-- Logo (中間層) -->
+        ${settings.shipping.logo ? `
+          <img src="${settings.shipping.logo}" style="
+            position: absolute;
+            top: ${settings.shipping.logoY}%;
+            left: ${settings.shipping.logoX}%;
+            transform: translate(-50%, -50%);
+            width: ${settings.shipping.logoSize}mm;
+            opacity: ${settings.shipping.logoOpacity / 100};
+            pointer-events: none;
+            z-index: 5;
+          ">
+        ` : ''}
+        
+        <!-- 訂單編號 (最上層) -->
+        ${settings.showOrderNumber && orderNo ? `
           <div style="
             position: absolute;
-            top: 50%;
+            top: ${settings.orderLabelTop}mm;
             left: 50%;
-            transform: translate(-50%, -50%) scale(${settings.paper.scale / 100});
-            transform-origin: center center;
+            transform: translateX(-50%);
+            background: white;
+            padding: 4px 12px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: ${settings.orderLabelSize}px;
+            font-weight: bold;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
           ">
-            ${data.html}
+            訂單編號：${orderNo}
           </div>
-        </div>
+        ` : ''}
       </div>
     `;
   }
