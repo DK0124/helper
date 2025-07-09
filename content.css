@@ -892,180 +892,93 @@
   }
 }
 
-/* 列印樣式 - 修正列印時的版面問題 */
+/* 列印樣式 - 完全重寫 */
 @media print {
-  /* 隱藏所有控制面板和非列印元素 */
+  /* 隱藏所有非列印元素 */
   #bv-shipping-assistant-panel,
   #bv-shipping-panel,
   .bv-notification,
   .ignore-print,
   body > *:not(#bv-preview-container) {
     display: none !important;
-    visibility: hidden !important;
   }
   
-  /* 重置基本樣式 */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
-  
-  /* 設定頁面大小 - 100mm x 150mm */
+  /* 設定頁面大小 */
   @page {
     size: 100mm 150mm;
     margin: 0;
   }
   
-  /* 重置html和body樣式 */
+  /* 基本重置 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
   html, body {
     margin: 0 !important;
     padding: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    overflow: visible !important;
+    width: 100mm !important;
+    height: auto !important;
   }
   
-  /* 設定列印容器 */
+  /* 列印容器 */
   #bv-preview-container {
     display: block !important;
-    visibility: visible !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 100% !important;
+    width: 100mm !important;
   }
   
-  /* 每個頁面的列印設定 - 關鍵修正 */
+  /* 每個列印頁面 */
   .bv-preview-page,
   .bv-print-page {
-    page-break-after: always !important;
-    page-break-inside: avoid !important;
-    box-shadow: none !important;
-    border: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    position: relative !important;
-    display: block !important;
     width: 100mm !important;
     height: 150mm !important;
-    overflow: visible !important; /* 改為 visible */
-    background: white !important;
-    transform: none !important; /* 確保沒有變形 */
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    position: relative !important;
+    overflow: hidden !important;
+    display: block !important;
+    box-sizing: border-box !important;
   }
   
   .bv-preview-page:last-child {
     page-break-after: auto !important;
   }
   
-  /* 物流單內容列印樣式 - 關鍵修正 */
-  .bv-shipping-content {
-    display: block !important; /* 改為 block */
-    visibility: visible !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    page-break-inside: avoid !important;
-    width: 100mm !important;
-    height: 150mm !important;
-    position: relative !important;
-    overflow: visible !important;
-  }
-  
-  /* 物流單內容置中容器 */
-  .bv-shipping-content > div:not(.bv-watermark-logo) {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-  
-  /* 原始物流單內容 */
-  .div_frame,
-  .bv-shipping-wrapper {
-    position: relative !important;
-    transform-origin: center center !important;
-  }
-  
-  /* 明細內容列印樣式 */
+  /* 物流單和明細內容容器 */
+  .bv-shipping-content,
   .bv-detail-content {
-    display: block !important;
-    visibility: visible !important;
-    margin: 0 !important;
-    page-break-inside: avoid !important;
     width: 100mm !important;
     height: 150mm !important;
-    position: relative !important;
-    overflow: visible !important;
-  }
-  
-  /* 確保圖片在列印時正確顯示 */
-  img {
-    display: inline-block !important;
-    visibility: visible !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    max-width: none !important;
-  }
-  
-  /* 底圖的淡化效果 */
-  .bv-watermark-logo {
-    display: block !important;
-    visibility: visible !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    filter: opacity(var(--opacity)) !important;
-    -webkit-filter: opacity(var(--opacity)) !important;
-    position: absolute !important;
-    pointer-events: none !important;
-  }
-  
-  /* QR Code 特別處理 */
-  img[src*="QRCode"],
-  img[src*="qrcode"],
-  img[src*="SendQRCode"] {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    transform: none !important;
-    filter: none !important;
-    -webkit-filter: none !important;
-    width: auto !important;
-    height: auto !important;
-  }
-  
-  /* 確保表格正確顯示 */
-  table {
-    display: table !important;
-    visibility: visible !important;
-    border-collapse: collapse !important;
-    width: 100% !important;
-  }
-  
-  tr {
-    display: table-row !important;
-    visibility: visible !important;
-  }
-  
-  td, th {
-    display: table-cell !important;
-    visibility: visible !important;
-    padding: 2px !important;
-  }
-  
-  /* 文字樣式 */
-  p, span, div, h1, h2, h3, h4, h5, h6 {
-    visibility: visible !important;
-    opacity: 1 !important;
     margin: 0 !important;
-    padding: 0 !important;
+    position: relative !important;
+    box-sizing: border-box !important;
   }
   
-  /* 訂單編號標籤確保顯示 */
-  div[style*="position: absolute"][style*="top:"] {
-    z-index: 9999 !important;
+  /* 確保所有圖片顯示 */
+  img {
+    max-width: none !important;
+    display: inline-block !important;
+  }
+  
+  /* 物流單原始內容保持原尺寸 */
+  .div_frame {
+    margin: 0 auto !important;
+  }
+}
+
+/* 螢幕顯示用的預覽樣式 */
+@media screen {
+  .bv-preview-page {
+    background: white;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin: 0 auto 20px auto;
+    position: relative;
+    overflow: hidden;
   }
 }
 
