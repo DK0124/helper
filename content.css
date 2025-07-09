@@ -861,112 +861,98 @@
   }
 }
 
-/* 列印樣式 - 專門針對 7-11 物流單優化 */
+/* 列印樣式修正 */
 @media print {
-  /* 基本重置 */
+  /* 基本設定 */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
   }
   
-  /* 隱藏控制面板 */
+  /* 隱藏控制元素 */
   #bv-shipping-assistant-panel,
   #bv-shipping-panel,
-  .bv-notification,
-  .ignore-print {
+  .bv-notification {
     display: none !important;
   }
   
-  /* 設定頁面大小 */
+  /* 頁面設定 */
   @page {
     size: 100mm 150mm;
     margin: 0;
   }
   
-  /* 預覽頁面樣式 */
-  .bv-preview-page {
-    page-break-after: always !important;
-    page-break-inside: avoid !important;
+  /* 確保預覽容器正確顯示 */
+  #bv-preview-container {
+    display: block !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 100mm !important;
-    height: 150mm !important;
-    position: relative !important;
-    overflow: hidden !important;
   }
   
-  .bv-preview-page:last-child {
+  /* 每個列印頁面 */
+  .bv-print-page {
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    position: relative !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  .bv-print-page:last-child {
     page-break-after: auto !important;
   }
   
-  /* 物流單內容 */
-  .bv-shipping-content {
-    width: 100mm !important;
-    height: 150mm !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    position: relative !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-  
-  /* 確保所有圖片都顯示 */
+  /* 確保圖片顯示 */
   img {
     display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
     max-width: none !important;
-    width: auto !important;
-    height: auto !important;
     page-break-inside: avoid !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    image-rendering: -webkit-optimize-contrast !important;
   }
   
-  /* 特別確保 QR Code 顯示 */
+  /* 特別處理 QR Code */
   img[src*="QRCode"],
   img[src*="qrcode"],
-  img[src*="ashx"],
-  img[width="150"],
-  img[width="80"] {
+  img[src*="ashx"] {
     display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    -webkit-filter: none !important;
-    filter: none !important;
     transform: none !important;
+    filter: none !important;
+    -webkit-filter: none !important;
   }
   
-  /* 確保表格正確顯示 */
-  table {
-    display: table !important;
-    visibility: visible !important;
+  /* 確保內容不被裁切 */
+  .bv-shipping-content,
+  .bv-detail-content {
+    overflow: visible !important;
   }
   
-  tr {
-    display: table-row !important;
-    visibility: visible !important;
-  }
+  /* 保持表格結構 */
+  table { display: table !important; }
+  tr { display: table-row !important; }
+  td { display: table-cell !important; }
   
-  td {
-    display: table-cell !important;
-    visibility: visible !important;
-  }
-  
-  /* 隱藏其他元素 */
+  /* 隱藏頁面其他元素 */
   body > *:not(#bv-preview-container) {
     display: none !important;
   }
 }
 
-/* Mac 特別優化 */
-@supports (-webkit-appearance: none) {
-  @media print {
-    img {
-      image-rendering: auto !important;
-      -webkit-print-color-adjust: exact !important;
-    }
+/* 預覽頁面樣式（非列印時） */
+@media screen {
+  .bv-preview-page {
+    background: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin: 0 auto 20px;
+    position: relative;
+  }
+  
+  #bv-preview-container {
+    padding: 20px;
+    background: #f5f5f5;
   }
 }
