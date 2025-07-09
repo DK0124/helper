@@ -1,4 +1,4 @@
-// BV SHOP 出貨助手 - 內容腳本 (修正版)
+// BV SHOP 出貨助手 - 內容腳本 (完整修正版)
 (function() {
   'use strict';
   
@@ -45,12 +45,69 @@
     return { type: 'unknown', provider: null };
   }
   
+  // === 圖片處理工具函數 ===
+  
+  function convertImgToBase64(img) {
+    return new Promise((resolve) => {
+      // 如果已經是 base64，直接返回
+      if (img.src.startsWith('data:')) {
+        resolve(img.src);
+        return;
+      }
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const image = new Image();
+      
+      image.crossOrigin = 'anonymous';
+      
+      image.onload = function() {
+        canvas.width = image.naturalWidth || image.width;
+        canvas.height = image.naturalHeight || image.height;
+        ctx.drawImage(image, 0, 0);
+        
+        try {
+          const dataURL = canvas.toDataURL('image/png');
+          resolve(dataURL);
+        } catch (e) {
+          console.error('圖片轉換失敗:', e);
+          resolve(img.src); // 失敗時返回原始 src
+        }
+      };
+      
+      image.onerror = function() {
+        console.error('圖片載入失敗:', img.src);
+        resolve(img.src); // 失敗時返回原始 src
+      };
+      
+      // 設定 src 觸發載入
+      image.src = img.src;
+    });
+  }
+  
+  async function processImagesToBase64(container) {
+    const imgs = container.querySelectorAll('img');
+    const promises = [];
+    
+    imgs.forEach(img => {
+      if (!img.src.startsWith('data:')) {
+        promises.push(
+          convertImgToBase64(img).then(base64 => {
+            img.src = base64;
+          })
+        );
+      }
+    });
+    
+    await Promise.all(promises);
+  }
+  
   // === 物流單頁面專用函數 ===
   
   function injectShippingPanel() {
     if (document.getElementById('bv-shipping-panel')) return;
     
-    // 建立浮動面板 - 不載入外部資源
+    // 建立浮動面板
     const panel = document.createElement('div');
     panel.id = 'bv-shipping-panel';
     panel.innerHTML = `
@@ -110,8 +167,7 @@
     }
   }
   
-  // 修正 fetchShippingData 函數
-  function fetchShippingData() {
+  async function fetchShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
     btn.disabled = true;
     btn.innerHTML = '抓取中...';
@@ -143,37 +199,37 @@
       
       console.log('找到的物流單框架數量:', frames.length);
       
-      frames.forEach((frame, index) => {
-        const clone = frame.cloneNode(true);
-      
-        // 將所有 img 轉成 base64
-        processImagesToBase64(clone, () => {
-          const htmlContent = clone.outerHTML.trim();
-          if (htmlContent && htmlContent.length > 100) {
-            shippingData.push({
-              html: htmlContent,
-              index: index
-            });
-          }
-        });
-      });
+      // 處理每個框架
+      for (let index = 0; index < frames.length; index++) {
+        const frame = frames[index];
         
-        // 處理圖片
-        clone.querySelectorAll('img').forEach(img => {
-          if (img.src && !img.src.startsWith('data:')) {
-            img.src = new URL(img.src, window.location.href).href;
+        // 確保框架有內容
+        if (!frame || frame.innerHTML.trim() === '') {
+          console.log('跳過空白框架:', index);
+          continue;
+        }
+        
+        const clone = frame.cloneNode(true);
+        
+        // 移除可能的空白元素
+        clone.querySelectorAll('*').forEach(element => {
+          if (element.innerHTML.trim() === '' && !element.querySelector('img')) {
+            element.remove();
           }
         });
+        
+        // 處理圖片轉為 base64
+        await processImagesToBase64(clone);
         
         // 只加入有實際內容的物流單
         const htmlContent = clone.outerHTML.trim();
-        if (htmlContent && htmlContent.length > 100) { // 確保有足夠的內容
+        if (htmlContent && htmlContent.length > 100) {
           shippingData.push({
             html: htmlContent,
             index: index
           });
         }
-      });
+      }
     }
     
     // 儲存資料時加入時間戳記
@@ -196,6 +252,8 @@
       });
     }
   }
+  
+  // === 明細頁面專用函數 ===
   
   function activateDetailPanel() {
     if (panelActive) return;
@@ -424,7 +482,7 @@
             
             <!-- Logo 設定 -->
             <div class="bv-control-group">
-              <div class="bv-control-group-title">Logo 設定</div>
+              <div class="bv-control-group-title">Logo 設定（底圖）</div>
               <div class="bv-logo-upload-area" id="bv-shipping-logo-upload">
                 <input type="file" id="bv-shipping-logo-input" accept="image/png" style="display:none;">
                 <img id="bv-shipping-logo-preview" class="bv-logo-preview" style="display:none;">
@@ -508,7 +566,7 @@
             
             <!-- Logo 設定 -->
             <div class="bv-control-group">
-              <div class="bv-control-group-title">Logo 設定</div>
+              <div class="bv-control-group-title">Logo 設定（底圖）</div>
               <div class="bv-logo-upload-area" id="bv-detail-logo-upload">
                 <input type="file" id="bv-detail-logo-input" accept="image/png" style="display:none;">
                 <img id="bv-detail-logo-preview" class="bv-logo-preview" style="display:none;">
@@ -664,28 +722,24 @@
     initPresetSystem();
   }
   
-  function fetchDetailData() {
+  async function fetchDetailData() {
     console.log('開始抓取明細');
     detailData = [];
     
     // 抓取所有 order-content
     const orderContents = document.querySelectorAll('.order-content');
     
-    orderContents.forEach((content, index) => {
+    for (const content of orderContents) {
       // 跳過只有圖片的容器
-      if (!content.querySelector('.order-info')) return;
+      if (!content.querySelector('.order-info')) continue;
       
       const clone = content.cloneNode(true);
       
       // 移除浮水印和底圖
       clone.querySelectorAll('.baseImage, .watermark').forEach(img => img.remove());
       
-      // 處理圖片
-      clone.querySelectorAll('img').forEach(img => {
-        if (img.src && !img.src.startsWith('data:')) {
-          img.src = new URL(img.src, window.location.href).href;
-        }
-      });
+      // 處理圖片轉為 base64
+      await processImagesToBase64(clone);
       
       // 提取訂單資訊
       const orderInfo = extractDetailOrderInfo(clone);
@@ -694,9 +748,9 @@
         html: clone.innerHTML,
         orderNo: orderInfo.orderNo,
         orderInfo: orderInfo,
-        index: index
+        index: detailData.length
       });
-    });
+    }
     
     console.log('抓取到的明細數量:', detailData.length);
     
@@ -999,8 +1053,6 @@
     
     // 清理HTML內容
     let cleanedHtml = data.html;
-    
-    // 移除可能的空白元素和換行
     cleanedHtml = cleanedHtml.replace(/>\s+</g, '><');
     
     return `
@@ -1009,59 +1061,76 @@
         height: ${settings.paper.height}mm;
         position: relative;
         overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         background: white;
         box-sizing: border-box;
         margin: 0;
         padding: 0;
       ">
-        ${settings.showOrderNumber && orderNo ? `
+        ${settings.shipping.logo ? `
           <div style="
             position: absolute;
-            top: ${settings.orderLabelTop}mm;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 4px 12px;
-            border: 1px solid #333;
-            border-radius: 4px;
-            font-size: ${settings.orderLabelSize}px;
-            font-weight: bold;
-            z-index: 1000;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            white-space: nowrap;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
           ">
-            訂單編號：${orderNo}
+            <img src="${settings.shipping.logo}" style="
+              position: absolute;
+              top: ${settings.shipping.logoY}%;
+              left: ${settings.shipping.logoX}%;
+              transform: translate(-50%, -50%);
+              width: ${settings.shipping.logoSize}mm;
+              opacity: ${settings.shipping.logoOpacity / 100};
+              pointer-events: none;
+            ">
           </div>
         ` : ''}
         
         <div style="
-          transform: scale(${settings.paper.scale / 100});
-          transform-origin: center center;
+          position: relative;
           width: 100%;
           height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
-          position: relative;
+          z-index: 2;
         ">
-          ${cleanedHtml}
-        </div>
-        
-        ${settings.shipping.logo ? `
-          <img src="${settings.shipping.logo}" style="
-            position: absolute;
-            top: ${settings.shipping.logoY}%;
-            left: ${settings.shipping.logoX}%;
-            transform: translate(-50%, -50%);
-            width: ${settings.shipping.logoSize}mm;
-            opacity: ${1 - (settings.shipping.logoOpacity / 100)};
-            pointer-events: none;
-            z-index: 5;
+          ${settings.showOrderNumber && orderNo ? `
+            <div style="
+              position: absolute;
+              top: ${settings.orderLabelTop}mm;
+              left: 50%;
+              transform: translateX(-50%);
+              background: white;
+              padding: 4px 12px;
+              border: 1px solid #333;
+              border-radius: 4px;
+              font-size: ${settings.orderLabelSize}px;
+              font-weight: bold;
+              z-index: 1000;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              white-space: nowrap;
+            ">
+              訂單編號：${orderNo}
+            </div>
+          ` : ''}
+          
+          <div style="
+            transform: scale(${settings.paper.scale / 100});
+            transform-origin: center center;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           ">
-        ` : ''}
+            ${cleanedHtml}
+          </div>
+        </div>
       </div>
     `;
   }
@@ -1078,120 +1147,140 @@
         height: ${settings.paper.height}mm;
         position: relative;
         overflow: hidden;
-        padding: ${settings.paper.margin}mm;
         font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
         font-size: ${settings.detail.textSize};
         box-sizing: border-box;
         background: white;
-        display: flex;
-        flex-direction: column;
         margin: 0;
+        padding: 0;
       ">
-        <div style="
-          transform: scale(${settings.paper.scale / 100});
-          transform-origin: top left;
-          width: ${100 / (settings.paper.scale / 100)}%;
-          height: ${100 / (settings.paper.scale / 100)}%;
-        ">
-          <h2 style="text-align: center; margin: 0 0 15px 0; font-size: 24px;">出貨明細</h2>
-          
-          <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: ${settings.detail.textSize};">
-            <div style="flex: 1; padding-right: 20px;">
-              <p style="margin: 3px 0;"><strong>訂單編號：</strong>${info.orderNo}</p>
-              <p style="margin: 3px 0;"><strong>訂購日期：</strong>${info.orderDate}</p>
-              <p style="margin: 3px 0;"><strong>訂購人：</strong>${fields.hideInfo ? maskName(info.customer) : info.customer}</p>
-              <p style="margin: 3px 0;"><strong>訂購人帳號：</strong>${info.customerAccount}</p>
-              <p style="margin: 3px 0;"><strong>聯絡電話：</strong>${fields.hideInfo ? maskPhone(info.phone) : info.phone}</p>
-            </div>
-            <div style="flex: 1;">
-              <p style="margin: 3px 0;"><strong>付款方式：</strong>${info.paymentMethod}</p>
-              <p style="margin: 3px 0;"><strong>送貨方式：</strong>${info.shippingMethod}</p>
-              <p style="margin: 3px 0;"><strong>收件人：</strong>${fields.hideInfo ? maskName(info.recipient) : info.recipient}</p>
-              <p style="margin: 3px 0;"><strong>收件人電話：</strong>${fields.hideInfo ? maskPhone(info.recipientPhone) : info.recipientPhone}</p>
-              <p style="margin: 3px 0;"><strong>送貨地址：</strong>${info.address}</p>
-              ${info.storeName ? `<p style="margin: 3px 0;"><strong>門市名稱：</strong>${info.storeName}</p>` : ''}
-              ${fields.deliveryTime && info.deliveryTime ? `<p style="margin: 3px 0;"><strong>指定配送時段：</strong>${info.deliveryTime}</p>` : ''}
-              ${fields.shippingTime && info.shippingTime ? `<p style="margin: 3px 0;"><strong>預計出貨日：</strong>${info.shippingTime}</p>` : ''}
-            </div>
-          </div>
-          
-          <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: ${settings.detail.textSize};">
-            <thead>
-              <tr style="border-top: 2px solid black; border-bottom: 2px solid black;">
-                <th style="text-align: left; padding: 6px;">品名</th>
-                ${!fields.hidePrice ? '<th style="text-align: right; padding: 6px;">單價</th>' : ''}
-                <th style="text-align: center; padding: 6px;">數量</th>
-                ${!fields.hidePrice ? '<th style="text-align: right; padding: 6px;">小計</th>' : ''}
-              </tr>
-            </thead>
-            <tbody>
-              ${info.items.map(item => `
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 6px;">
-                    ${fields.productImage && item.image ? `<img src="${item.image}" style="width: 40px; height: 40px; object-fit: cover; vertical-align: middle; margin-right: 8px;">` : ''}
-                    ${item.name}
-                  </td>
-                  ${!fields.hidePrice ? `<td style="text-align: right; padding: 6px;">${item.price}</td>` : ''}
-                  <td style="text-align: center; padding: 6px;">${item.qty}</td>
-                  ${!fields.hidePrice ? `<td style="text-align: right; padding: 6px;">${item.subtotal}</td>` : ''}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          ${!fields.hidePrice ? `
-            <table style="width: 100%; border-top: 1px solid black; border-bottom: 1px solid black; margin-top: 15px; font-size: ${settings.detail.textSize};">
-              <tr>
-                <td style="text-align: right; padding: 6px;">商品總數量：</td>
-                <td style="text-align: right; padding: 6px; width: 120px;">${info.totalQty}</td>
-              </tr>
-              ${info.extraShipping ? `
-                <tr>
-                  <td style="text-align: right; padding: 6px;">額外運費：</td>
-                  <td style="text-align: right; padding: 6px;">${info.extraShipping}</td>
-                </tr>
-              ` : ''}
-              <tr>
-                <td style="text-align: right; padding: 6px; font-weight: bold;">總計：</td>
-                <td style="text-align: right; padding: 6px; font-weight: bold;">${info.total}</td>
-              </tr>
-            </table>
-          ` : ''}
-          
-          ${fields.remark && info.remark ? `
-            <div style="margin-top: 15px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
-              <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">顧客備註</div>
-              <div style="font-size: ${settings.detail.textSize};">${info.remark}</div>
-            </div>
-          ` : ''}
-          
-          ${fields.manageRemark && info.manageRemark ? `
-            <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
-              <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">後台備註</div>
-              <div style="font-size: ${settings.detail.textSize};">${info.manageRemark}</div>
-            </div>
-          ` : ''}
-          
-          ${fields.printRemark && info.printRemark ? `
-            <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
-              <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">列印備註</div>
-              <div style="font-size: ${settings.detail.textSize};">${info.printRemark}</div>
-            </div>
-          ` : ''}
-        </div>
-        
         ${settings.detail.logo ? `
-          <img src="${settings.detail.logo}" style="
+          <div style="
             position: absolute;
-            top: ${settings.detail.logoY}%;
-            left: ${settings.detail.logoX}%;
-            transform: translate(-50%, -50%);
-            width: ${settings.detail.logoSize}mm;
-            opacity: ${1 - (settings.detail.logoOpacity / 100)};
-            pointer-events: none;
-            z-index: 5;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
           ">
+            <img src="${settings.detail.logo}" style="
+              position: absolute;
+              top: ${settings.detail.logoY}%;
+              left: ${settings.detail.logoX}%;
+              transform: translate(-50%, -50%);
+              width: ${settings.detail.logoSize}mm;
+              opacity: ${settings.detail.logoOpacity / 100};
+              pointer-events: none;
+            ">
+          </div>
         ` : ''}
+        
+        <div style="
+          position: relative;
+          z-index: 2;
+          padding: ${settings.paper.margin}mm;
+          width: 100%;
+          height: 100%;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+        ">
+          <div style="
+            transform: scale(${settings.paper.scale / 100});
+            transform-origin: top left;
+            width: ${100 / (settings.paper.scale / 100)}%;
+            height: ${100 / (settings.paper.scale / 100)}%;
+          ">
+            <h2 style="text-align: center; margin: 0 0 15px 0; font-size: 24px;">出貨明細</h2>
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: ${settings.detail.textSize};">
+              <div style="flex: 1; padding-right: 20px;">
+                <p style="margin: 3px 0;"><strong>訂單編號：</strong>${info.orderNo}</p>
+                <p style="margin: 3px 0;"><strong>訂購日期：</strong>${info.orderDate}</p>
+                <p style="margin: 3px 0;"><strong>訂購人：</strong>${fields.hideInfo ? maskName(info.customer) : info.customer}</p>
+                <p style="margin: 3px 0;"><strong>訂購人帳號：</strong>${info.customerAccount}</p>
+                <p style="margin: 3px 0;"><strong>聯絡電話：</strong>${fields.hideInfo ? maskPhone(info.phone) : info.phone}</p>
+              </div>
+              <div style="flex: 1;">
+                <p style="margin: 3px 0;"><strong>付款方式：</strong>${info.paymentMethod}</p>
+                <p style="margin: 3px 0;"><strong>送貨方式：</strong>${info.shippingMethod}</p>
+                <p style="margin: 3px 0;"><strong>收件人：</strong>${fields.hideInfo ? maskName(info.recipient) : info.recipient}</p>
+                <p style="margin: 3px 0;"><strong>收件人電話：</strong>${fields.hideInfo ? maskPhone(info.recipientPhone) : info.recipientPhone}</p>
+                <p style="margin: 3px 0;"><strong>送貨地址：</strong>${info.address}</p>
+                ${info.storeName ? `<p style="margin: 3px 0;"><strong>門市名稱：</strong>${info.storeName}</p>` : ''}
+                ${fields.deliveryTime && info.deliveryTime ? `<p style="margin: 3px 0;"><strong>指定配送時段：</strong>${info.deliveryTime}</p>` : ''}
+                ${fields.shippingTime && info.shippingTime ? `<p style="margin: 3px 0;"><strong>預計出貨日：</strong>${info.shippingTime}</p>` : ''}
+              </div>
+            </div>
+            
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: ${settings.detail.textSize};">
+              <thead>
+                <tr style="border-top: 2px solid black; border-bottom: 2px solid black;">
+                  <th style="text-align: left; padding: 6px;">品名</th>
+                  ${!fields.hidePrice ? '<th style="text-align: right; padding: 6px;">單價</th>' : ''}
+                  <th style="text-align: center; padding: 6px;">數量</th>
+                  ${!fields.hidePrice ? '<th style="text-align: right; padding: 6px;">小計</th>' : ''}
+                </tr>
+              </thead>
+              <tbody>
+                ${info.items.map(item => `
+                  <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 6px;">
+                      ${fields.productImage && item.image ? `<img src="${item.image}" style="width: 40px; height: 40px; object-fit: cover; vertical-align: middle; margin-right: 8px;">` : ''}
+                      ${item.name}
+                    </td>
+                    ${!fields.hidePrice ? `<td style="text-align: right; padding: 6px;">${item.price}</td>` : ''}
+                    <td style="text-align: center; padding: 6px;">${item.qty}</td>
+                    ${!fields.hidePrice ? `<td style="text-align: right; padding: 6px;">${item.subtotal}</td>` : ''}
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            
+            ${!fields.hidePrice ? `
+              <table style="width: 100%; border-top: 1px solid black; border-bottom: 1px solid black; margin-top: 15px; font-size: ${settings.detail.textSize};">
+                <tr>
+                  <td style="text-align: right; padding: 6px;">商品總數量：</td>
+                  <td style="text-align: right; padding: 6px; width: 120px;">${info.totalQty}</td>
+                </tr>
+                ${info.extraShipping ? `
+                  <tr>
+                    <td style="text-align: right; padding: 6px;">額外運費：</td>
+                    <td style="text-align: right; padding: 6px;">${info.extraShipping}</td>
+                  </tr>
+                ` : ''}
+                <tr>
+                  <td style="text-align: right; padding: 6px; font-weight: bold;">總計：</td>
+                  <td style="text-align: right; padding: 6px; font-weight: bold;">${info.total}</td>
+                </tr>
+              </table>
+            ` : ''}
+            
+            ${fields.remark && info.remark ? `
+              <div style="margin-top: 15px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+                <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">顧客備註</div>
+                <div style="font-size: ${settings.detail.textSize};">${info.remark}</div>
+              </div>
+            ` : ''}
+            
+            ${fields.manageRemark && info.manageRemark ? `
+              <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+                <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">後台備註</div>
+                <div style="font-size: ${settings.detail.textSize};">${info.manageRemark}</div>
+              </div>
+            ` : ''}
+            
+            ${fields.printRemark && info.printRemark ? `
+              <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+                <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">列印備註</div>
+                <div style="font-size: ${settings.detail.textSize};">${info.printRemark}</div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
       </div>
     `;
     
