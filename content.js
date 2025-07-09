@@ -184,6 +184,7 @@
     }
   }
   
+  // 修正 fetchShippingData - 使用舊版的簡單方法
   async function fetchShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
     btn.disabled = true;
@@ -192,134 +193,73 @@
     shippingData = [];
     
     if (currentPage.provider === 'seven') {
-      console.log('開始抓取 7-11 物流單');
+      // 使用舊版成功的方法
+      const tables = document.querySelectorAll('table');
+      const shippingTables = [];
       
-      // 7-11 的結構：每個頁面有一個大表格，包含兩張物流單
-      // 每張物流單在一個 td 裡，td 有 border 樣式
-      
-      // 方法1: 找到包含物流單的 td
-      const shippingCells = document.querySelectorAll('td[style*="border"][style*="dashed"]');
-      console.log('找到的 td 數量:', shippingCells.length);
-      
-      // 方法2: 如果上面找不到，試著找 div_frame
-      let frames = [];
-      if (shippingCells.length === 0) {
-        frames = document.querySelectorAll('.div_frame');
-        console.log('找到的 div_frame 數量:', frames.length);
-      }
-      
-      // 方法3: 找包含特定尺寸的 div
-      if (shippingCells.length === 0 && frames.length === 0) {
-        const allDivs = document.querySelectorAll('div[style*="width: 298px"][style*="height: 450px"]');
-        frames = Array.from(allDivs);
-        console.log('找到的固定尺寸 div 數量:', frames.length);
-      }
-      
-      // 處理找到的元素
-      if (shippingCells.length > 0) {
-        // 處理 td 元素
-        shippingCells.forEach((td, index) => {
-          // 跳過空的 td
-          if (!td.querySelector('div') || td.textContent.trim().length < 50) {
-            console.log('跳過空的 td:', index);
-            return;
-          }
-          
-          // 找到 td 內的實際內容 div
-          const contentDiv = td.querySelector('div[style*="border: 2px solid"]') || 
-                            td.querySelector('.div_frame') ||
-                            td.querySelector('div');
-          
-          if (contentDiv) {
-            const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'width: 300px; height: 450px; margin: 0 auto;';
-            
-            const clone = contentDiv.cloneNode(true);
-            
-            // 處理圖片
-            clone.querySelectorAll('img').forEach(img => {
-              if (!img.src.startsWith('http') && !img.src.startsWith('data:')) {
-                img.src = new URL(img.src, window.location.href).href;
-              }
-            });
-            
-            wrapper.appendChild(clone);
-            
-            // 提取訂單編號
-            const text = clone.textContent;
-            let orderNo = '';
-            
-            // 尋找訂單編號
-            const orderMatch = text.match(/寄件訂單編號[:：]\s*(\d+)/) ||
-                             text.match(/訂單編號[:：]\s*(\d+)/) ||
-                             text.match(/(\d{8,})/);
-            
-            if (orderMatch) {
-              orderNo = orderMatch[1] || orderMatch[0];
+      // 找出包含物流單的表格
+      tables.forEach(table => {
+        const text = table.textContent;
+        const hasShippingKeywords = text.includes('交貨便') || 
+                                   text.includes('統一超商') ||
+                                   text.includes('7-11') ||
+                                   text.includes('寄件編號');
+        
+        if (hasShippingKeywords) {
+          // 檢查是否為獨立的物流單表格
+          const parentTd = table.closest('td[style*="border"]');
+          if (parentTd) {
+            // 確保不重複添加
+            if (!shippingTables.includes(parentTd)) {
+              shippingTables.push(parentTd);
             }
-            
-            console.log(`物流單 ${index + 1} - 訂單編號: ${orderNo}`);
-            
-            shippingData.push({
-              html: wrapper.outerHTML,
-              orderNo: orderNo,
-              index: index
-            });
+          } else {
+            // 如果沒有找到 td，可能整個 table 就是物流單
+            shippingTables.push(table);
+          }
+        }
+      });
+      
+      console.log('找到的物流單數量:', shippingTables.length);
+      
+      shippingTables.forEach((element, index) => {
+        const clone = element.cloneNode(true);
+        
+        // 不做任何圖片處理，保持原始狀態
+        // 只確保相對路徑的圖片有完整 URL
+        clone.querySelectorAll('img').forEach(img => {
+          if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('http')) {
+            img.src = new URL(img.src, window.location.href).href;
           }
         });
-      } else if (frames.length > 0) {
-        // 處理 div_frame 或其他 div
-        frames.forEach((frame, index) => {
-          if (frame.textContent.trim().length < 50) {
-            console.log('跳過空的 frame:', index);
-            return;
-          }
-          
-          const wrapper = document.createElement('div');
-          wrapper.style.cssText = 'width: 300px; height: 450px; margin: 0 auto;';
-          
-          const clone = frame.cloneNode(true);
-          
-          // 處理圖片
-          clone.querySelectorAll('img').forEach(img => {
-            if (!img.src.startsWith('http') && !img.src.startsWith('data:')) {
-              img.src = new URL(img.src, window.location.href).href;
-            }
-          });
-          
-          wrapper.appendChild(clone);
-          
-          // 提取訂單編號
-          const text = clone.textContent;
-          let orderNo = '';
-          
-          const orderMatch = text.match(/寄件訂單編號[:：]\s*(\d+)/) ||
-                           text.match(/訂單編號[:：]\s*(\d+)/) ||
-                           text.match(/(\d{8,})/);
-          
-          if (orderMatch) {
-            orderNo = orderMatch[1] || orderMatch[0];
-          }
-          
-          console.log(`物流單 ${index + 1} - 訂單編號: ${orderNo}`);
-          
+        
+        // 找訂單編號
+        let orderNo = '';
+        const text = clone.textContent;
+        const orderMatch = text.match(/訂單[編號]*[:：]?\s*(\w+)/) || 
+                          text.match(/寄件訂單編號[:：]?\s*(\d+)/) ||
+                          text.match(/寄件[編號]*[:：]?\s*(\w+)/) ||
+                          text.match(/E\d{10,}/);
+        if (orderMatch) {
+          orderNo = orderMatch[1] || orderMatch[0];
+        }
+        
+        // 確保有實際內容
+        if (clone.textContent.trim().length > 50) {
           shippingData.push({
-            html: wrapper.outerHTML,
+            html: clone.outerHTML,
             orderNo: orderNo,
             index: index
           });
-        });
-      }
-      
-      console.log('最終抓取到的物流單數量:', shippingData.length);
+        }
+      });
     }
     
     // 儲存資料
     if (chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({ 
         bvShippingData: shippingData,
-        lastProvider: currentPage.provider,
-        timestamp: Date.now()
+        lastProvider: currentPage.provider 
       }, () => {
         btn.disabled = false;
         btn.innerHTML = '重新抓取物流單';
@@ -335,173 +275,68 @@
     }
   }
   
-  // 同時修正預覽時的配對邏輯
-  function generatePages(printOrder, settings) {
-    const pages = [];
-    let pageOrder = [];
+  // 修正 generateShippingPage - 考慮實際尺寸差異
+  function generateShippingPage(data, settings, orderNo) {
+    if (!data || !data.html) return '';
     
-    // 確保資料數量正確
-    const shippingLength = shippingData.length;
-    const detailLength = detailData.length;
+    // 7-11 物流單實際是 100×140mm，但印在 100×150mm 紙上
+    // 所以需要垂直置中，上下各留 5mm
+    const verticalOffset = currentPage.provider === 'seven' ? 5 : 0;
     
-    console.log(`產生頁面 - 物流單: ${shippingLength}, 明細: ${detailLength}`);
-    
-    // 根據列印順序產生頁面順序
-    switch (printOrder) {
-      case 'sequential': // 依序交錯
-        const maxLength = Math.max(shippingLength, detailLength);
-        for (let i = 0; i < maxLength; i++) {
-          if (i < shippingLength) {
-            pageOrder.push({ type: 'shipping', index: i });
-          }
-          if (i < detailLength) {
-            pageOrder.push({ type: 'detail', index: i });
-          }
-        }
-        break;
-        
-      case 'reverse': // 反序交錯
-        const maxLengthRev = Math.max(shippingLength, detailLength);
-        for (let i = 0; i < maxLengthRev; i++) {
-          const shippingIndex = shippingLength - 1 - i;
-          if (shippingIndex >= 0) {
-            pageOrder.push({ type: 'shipping', index: shippingIndex });
-          }
-          if (i < detailLength) {
-            pageOrder.push({ type: 'detail', index: i });
-          }
-        }
-        break;
-        
-      case 'shipping-only': // 純印物流單（正序）
-        for (let i = 0; i < shippingLength; i++) {
-          pageOrder.push({ type: 'shipping', index: i });
-        }
-        break;
-        
-      case 'shipping-only-reverse': // 純印物流單（反序）
-        for (let i = shippingLength - 1; i >= 0; i--) {
-          pageOrder.push({ type: 'shipping', index: i });
-        }
-        break;
-        
-      case 'detail-only': // 純印出貨明細（正序）
-        for (let i = 0; i < detailLength; i++) {
-          pageOrder.push({ type: 'detail', index: i });
-        }
-        break;
-        
-      case 'detail-only-reverse': // 純印出貨明細（反序）
-        for (let i = detailLength - 1; i >= 0; i--) {
-          pageOrder.push({ type: 'detail', index: i });
-        }
-        break;
-    }
-    
-    console.log('頁面順序:', pageOrder);
-    
-    // 產生每個頁面
-    pageOrder.forEach((item, pageIndex) => {
-      const page = document.createElement('div');
-      page.className = 'bv-preview-page bv-print-page';
-      
-      // 使用統一的紙張尺寸
-      page.style.width = settings.paper.width + 'mm';
-      page.style.height = settings.paper.height + 'mm';
-      
-      if (item.type === 'shipping') {
-        const data = shippingData[item.index];
-        if (data) {
-          // 如果是依序交錯，嘗試找對應的明細訂單編號
-          let orderNo = data.orderNo;
-          if (printOrder === 'sequential' && detailData[item.index]) {
-            orderNo = detailData[item.index].orderNo || data.orderNo;
-          }
-          page.innerHTML = generateShippingPage(data, settings, orderNo);
-        }
-      } else {
-        const data = detailData[item.index];
-        if (data) {
-          page.innerHTML = generateDetailPage(data, settings);
-        }
-      }
-      
-      pages.push(page);
-    });
-    
-    return pages;
-  }
-  // === 明細頁面專用函數 ===
-  function activateDetailPanel() {
-    if (panelActive) return;
-    
-    // 檢查是否有物流單資料
-    if (chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(['bvShippingData'], (result) => {
-        if (!result.bvShippingData || result.bvShippingData.length === 0) {
-          showNotification('請先至後台「更多操作」>「列印物流單」依照畫面提示抓取物流單', 'warning');
-          return;
-        }
-        
-        // 載入資源
-        loadExternalResources();
-        
-        // 隱藏原始控制區域
-        const originalControls = document.querySelector('.ignore-print');
-        if (originalControls) {
-          originalControls.style.display = 'none';
-        }
-        
-        // 建立面板
-        const panel = document.createElement('div');
-        panel.id = 'bv-shipping-assistant-panel';
-        panel.innerHTML = getDetailPanelHTML();
-        panel.style.display = 'block';
-        document.body.appendChild(panel);
-        
-        // 設定預覽區域
-        setupDetailPagePreview();
-        
-        // 初始化
-        setTimeout(() => {
-          initializeDetailEventListeners();
-          loadSavedSettings();
-          loadSavedData();
+    return `
+      <div style="
+        width: ${settings.paper.width}mm;
+        height: ${settings.paper.height}mm;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+      ">
+        <!-- 物流單內容 -->
+        <div style="
+          position: relative;
+          transform: scale(${settings.paper.scale / 100});
+          transform-origin: center center;
+        ">
+          ${data.html}
           
-          // 如果頁面已有訂單，自動抓取
-          if (document.querySelector('.order-content')) {
-            setTimeout(fetchDetailData, 500);
-          }
-        }, 100);
-        
-        panelActive = true;
-      });
-    }
-  }
-  
-  function deactivateDetailPanel() {
-    if (!panelActive) return;
-    
-    // 移除面板
-    const panel = document.getElementById('bv-shipping-assistant-panel');
-    if (panel) panel.remove();
-    
-    // 移除預覽容器
-    const container = document.getElementById('bv-preview-container');
-    if (container) container.remove();
-    
-    // 恢復原始控制區域
-    const originalControls = document.querySelector('.ignore-print');
-    if (originalControls) {
-      originalControls.style.display = '';
-    }
-    
-    // 恢復隱藏的元素
-    document.querySelectorAll('.order-content').forEach(content => {
-      content.style.display = '';
-    });
-    
-    panelActive = false;
+          <!-- 訂單編號標籤 -->
+          ${settings.showOrderNumber && orderNo ? `
+            <div style="
+              position: absolute;
+              top: ${settings.orderLabelTop}mm;
+              left: 50%;
+              transform: translateX(-50%);
+              background: white;
+              padding: 2px 8px;
+              border: 1px solid #333;
+              border-radius: 3px;
+              font-size: ${settings.orderLabelSize}px;
+              font-weight: bold;
+              z-index: 10;
+            ">
+              訂單編號：${orderNo}
+            </div>
+          ` : ''}
+          
+          <!-- Logo -->
+          ${settings.shipping.logo ? `
+            <img src="${settings.shipping.logo}" style="
+              position: absolute;
+              top: ${settings.shipping.logoY}%;
+              left: ${settings.shipping.logoX}%;
+              transform: translate(-50%, -50%);
+              width: ${settings.shipping.logoSize}mm;
+              opacity: ${1 - (settings.shipping.logoOpacity / 100)};
+              pointer-events: none;
+              z-index: 5;
+            ">
+          ` : ''}
+        </div>
+      </div>
+    `;
   }
   
   function loadExternalResources() {
