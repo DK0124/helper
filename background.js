@@ -1,4 +1,6 @@
-// BV SHOP 出貨助手 - 背景腳本 (改進版)
+// BV SHOP 出貨助手 - 背景腳本 (Service Worker 版本)
+
+// 監聽擴充功能圖示點擊
 chrome.action.onClicked.addListener((tab) => {
   // 檢查是否為支援的頁面
   const supportedUrls = [
@@ -12,7 +14,7 @@ chrome.action.onClicked.addListener((tab) => {
     'bvshop'
   ];
   
-  const isSupported = supportedUrls.some(url => tab.url.includes(url));
+  const isSupported = supportedUrls.some(url => tab.url && tab.url.includes(url));
   
   if (isSupported) {
     // 先檢查 content script 是否已經注入
@@ -23,24 +25,27 @@ chrome.action.onClicked.addListener((tab) => {
           target: { tabId: tab.id },
           files: ['content.js']
         }, () => {
+          if (chrome.runtime.lastError) {
+            console.error('無法注入 content script:', chrome.runtime.lastError);
+            return;
+          }
+          
           // 注入 CSS
           chrome.scripting.insertCSS({
             target: { tabId: tab.id },
             files: ['content.css']
           }, () => {
+            if (chrome.runtime.lastError) {
+              console.error('無法注入 CSS:', chrome.runtime.lastError);
+              return;
+            }
+            
             // 稍等一下讓 content script 初始化
             setTimeout(() => {
               // 現在發送訊息
               chrome.tabs.sendMessage(tab.id, { action: 'togglePanel' }, (response) => {
                 if (chrome.runtime.lastError) {
                   console.error('無法與內容腳本通訊:', chrome.runtime.lastError);
-                  // 顯示錯誤通知
-                  chrome.notifications.create({
-                    type: 'basic',
-                    iconUrl: chrome.runtime.getURL('icon48.png'),
-                    title: 'BV SHOP 出貨助手',
-                    message: '無法啟動擴充功能，請重新整理頁面後再試'
-                  });
                 }
               });
             }, 100);
@@ -56,60 +61,20 @@ chrome.action.onClicked.addListener((tab) => {
       }
     });
   } else {
-    // 顯示不支援的通知
-    chrome.notifications.create({
-      type: 'basic',
-      iconUrl: chrome.runtime.getURL('icon48.png'),
-      title: 'BV SHOP 出貨助手',
-      message: '此頁面不支援 BV SHOP 出貨助手'
-    });
+    // 不支援的頁面，簡單提示
+    console.log('此頁面不支援 BV SHOP 出貨助手');
   }
 });
 
 // 監聽安裝事件
 chrome.runtime.onInstalled.addListener(() => {
   console.log('BV SHOP 出貨助手已安裝');
-  
-  // 設定擴充功能規則（Manifest V3）
-  chrome.declarativeContent.onPageChanged.removeRules(undefined, () => {
-    chrome.declarativeContent.onPageChanged.addRules([
-      {
-        conditions: [
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { hostContains: 'myship.7-11.com.tw' }
-          }),
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { hostContains: 'epayment.7-11.com.tw' }
-          }),
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { hostContains: 'eship.7-11.com.tw' }
-          }),
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { hostContains: 'family.com.tw' }
-          }),
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { hostContains: 'famiport.com.tw' }
-          }),
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { hostContains: 'hilife.com.tw' }
-          }),
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { hostContains: 'okmart.com.tw' }
-          }),
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { hostContains: 'bvshop' }
-          })
-        ],
-        actions: [new chrome.declarativeContent.ShowAction()]
-      }
-    ]);
-  });
 });
 
 // 監聽來自 content script 的訊息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'contentScriptReady') {
-    console.log('Content script 已準備就緒:', sender.tab.url);
+    console.log('Content script 已準備就緒:', sender.tab?.url);
     sendResponse({ status: 'acknowledged' });
   }
   return true;
@@ -117,7 +82,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // 監聽標籤更新事件
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete') {
+  if (changeInfo.status === 'complete' && tab.url) {
     // 檢查是否為支援的網站
     const supportedUrls = [
       'myship.7-11.com.tw',
@@ -130,7 +95,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       'bvshop'
     ];
     
-    const isSupported = supportedUrls.some(url => tab.url && tab.url.includes(url));
+    const isSupported = supportedUrls.some(url => tab.url.includes(url));
     
     if (isSupported) {
       // 檢查是否需要自動注入 content script（針對物流單頁面）
@@ -144,7 +109,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         'okmart.com.tw'
       ];
       
-      const isShippingPage = shippingUrls.some(url => tab.url && tab.url.includes(url));
+      const isShippingPage = shippingUrls.some(url => tab.url.includes(url));
       
       if (isShippingPage) {
         // 物流單頁面自動注入
@@ -155,10 +120,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
               target: { tabId: tabId },
               files: ['content.js']
             }, () => {
-              chrome.scripting.insertCSS({
-                target: { tabId: tabId },
-                files: ['content.css']
-              });
+              if (!chrome.runtime.lastError) {
+                chrome.scripting.insertCSS({
+                  target: { tabId: tabId },
+                  files: ['content.css']
+                });
+              }
             });
           }
         });
@@ -170,9 +137,4 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // 處理擴充功能更新或重新載入的情況
 chrome.runtime.onStartup.addListener(() => {
   console.log('BV SHOP 出貨助手已啟動');
-});
-
-// 清理無效的通知
-chrome.notifications.onClosed.addListener((notificationId) => {
-  console.log('通知已關閉:', notificationId);
 });
