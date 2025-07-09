@@ -1413,8 +1413,6 @@ if (currentPage.type === 'shipping') {
   function getSettings() {
     return {
       paper: {
-        width: parseInt(document.getElementById('bv-paper-width')?.value || 100
-      paper: {
         width: parseInt(document.getElementById('bv-paper-width')?.value || 100),
         height: parseInt(document.getElementById('bv-paper-height')?.value || 150),
         scale: parseInt(document.getElementById('bv-scale')?.value || 100),
