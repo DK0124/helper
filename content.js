@@ -144,20 +144,19 @@
       console.log('找到的物流單框架數量:', frames.length);
       
       frames.forEach((frame, index) => {
-        // 確保框架有內容
-        if (!frame || frame.innerHTML.trim() === '') {
-          console.log('跳過空白框架:', index);
-          return;
-        }
-        
         const clone = frame.cloneNode(true);
-        
-        // 移除可能的空白元素
-        clone.querySelectorAll('*').forEach(element => {
-          if (element.innerHTML.trim() === '' && !element.querySelector('img')) {
-            element.remove();
+      
+        // 將所有 img 轉成 base64
+        processImagesToBase64(clone, () => {
+          const htmlContent = clone.outerHTML.trim();
+          if (htmlContent && htmlContent.length > 100) {
+            shippingData.push({
+              html: htmlContent,
+              index: index
+            });
           }
         });
+      });
         
         // 處理圖片
         clone.querySelectorAll('img').forEach(img => {
