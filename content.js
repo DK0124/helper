@@ -3,25 +3,44 @@
   'use strict';
   
   console.log('BV SHOP 出貨助手已載入');
-
-// 通知 background script content script 已準備就緒
-if (chrome.runtime && chrome.runtime.sendMessage) {
-  chrome.runtime.sendMessage({ action: 'contentScriptReady' }, (response) => {
-    if (chrome.runtime.lastError) {
-      console.log('無法連接到 background script:', chrome.runtime.lastError);
+  
+  // 立即通知 background script
+  if (chrome.runtime && chrome.runtime.sendMessage) {
+    try {
+      chrome.runtime.sendMessage({ action: 'contentScriptReady' });
+    } catch (e) {
+      console.log('無法連接到 background script:', e.message);
     }
-  });
-}
-
-// 回應 ping 訊息
-if (chrome.runtime && chrome.runtime.onMessage) {
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'ping') {
-      sendResponse({ status: 'pong' });
-      return true;
-    }
-  });
-}  
+  }
+  
+  // 設定訊息監聽器（必須在最前面）
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      // 回應 ping
+      if (request.action === 'ping') {
+        sendResponse({ status: 'pong' });
+        return true;
+      }
+      
+      // 處理切換面板
+      if (request.action === 'togglePanel') {
+        try {
+          if (currentPage.type === 'detail') {
+            if (panelActive) {
+              deactivateDetailPanel();
+            } else {
+              activateDetailPanel();
+            }
+          }
+          sendResponse({ status: 'success' });
+        } catch (error) {
+          console.error('處理訊息時發生錯誤:', error);
+          sendResponse({ status: 'error', message: error.message });
+        }
+        return true;
+      }
+    });
+  }
 
   // 全域變數
   let currentPage = detectCurrentPage();
