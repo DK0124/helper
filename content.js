@@ -161,6 +161,7 @@
     }
   }
   
+  // 修正抓取物流單的方式 - 保持原始格式
   function fetchShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
     btn.disabled = true;
@@ -171,21 +172,29 @@
     if (currentPage.provider === 'seven') {
       console.log('開始抓取 7-11 物流單');
       
+      // 找到所有物流單框架
       let frames = document.querySelectorAll('.div_frame');
       
       if (frames.length === 0) {
+        // 嘗試其他方式找物流單
         const allDivs = document.querySelectorAll('div');
         const potentialFrames = [];
         
         allDivs.forEach(div => {
+          // 檢查是否包含物流單特徵
           if (div.textContent.includes('交貨便') && 
               div.textContent.includes('統一超商') &&
               (div.querySelector('img[src*="QRCode"]') || div.querySelector('img[src*="qrcode"]'))) {
             
+            // 找到包含完整物流單的容器
             let container = div;
-            while (container.parentElement && 
-                   !container.style.border && 
-                   !container.className.includes('frame')) {
+            while (container.parentElement) {
+              const rect = container.getBoundingClientRect();
+              // 7-11 物流單標準尺寸約為 283px × 425px
+              if (rect.width >= 250 && rect.width <= 350 && 
+                  rect.height >= 400 && rect.height <= 500) {
+                break;
+              }
               container = container.parentElement;
             }
             
@@ -202,24 +211,41 @@
       
       frames.forEach((frame, index) => {
         try {
+          // 檢查內容是否足夠
           if (frame.textContent.trim().length < 100) {
             console.log('跳過空框架:', index);
             return;
           }
           
-          // 直接克隆，不包裝
+          // 克隆整個框架，保持原始結構
           const clone = frame.cloneNode(true);
           
-          // 處理圖片
+          // 確保所有樣式都被保留
+          const computedStyle = window.getComputedStyle(frame);
+          clone.style.width = computedStyle.width;
+          clone.style.height = computedStyle.height;
+          clone.style.border = computedStyle.border;
+          clone.style.padding = computedStyle.padding;
+          clone.style.margin = '0';
+          clone.style.boxSizing = 'border-box';
+          
+          // 處理所有圖片，確保 URL 完整
           const images = clone.querySelectorAll('img');
           images.forEach(img => {
             const originalSrc = img.getAttribute('src');
             if (originalSrc && !originalSrc.startsWith('data:') && !originalSrc.startsWith('http')) {
               img.src = new URL(originalSrc, window.location.href).href;
             }
+            // 保留圖片尺寸
+            if (img.hasAttribute('width')) {
+              img.style.width = img.getAttribute('width') + 'px';
+            }
+            if (img.hasAttribute('height')) {
+              img.style.height = img.getAttribute('height') + 'px';
+            }
           });
           
-          // 提取資訊
+          // 提取必要資訊
           let orderNo = '';
           let serviceCode = '';
           const text = clone.textContent || '';
@@ -230,7 +256,7 @@
             orderNo = orderMatch[1];
           }
           
-          // 提取服務代碼
+          // 提取服務代碼（物流編號）
           const serviceCodeElement = clone.querySelector('span[id*="lblC2BPinCode"]');
           if (serviceCodeElement) {
             serviceCode = serviceCodeElement.textContent.trim();
@@ -243,10 +269,13 @@
           
           console.log(`物流單 ${index + 1} - 訂單編號: ${orderNo || '未找到'}, 服務代碼: ${serviceCode || '未找到'}`);
           
+          // 儲存原始尺寸和內容
           shippingData.push({
             html: clone.outerHTML,
             orderNo: orderNo,
             serviceCode: serviceCode,
+            originalWidth: computedStyle.width,
+            originalHeight: computedStyle.height,
             index: index
           });
         } catch (error) {
@@ -257,6 +286,7 @@
     
     saveShippingData();
   }
+  
   function saveShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
     
@@ -1201,26 +1231,27 @@
     return pages;
   }
   
+  // 修正生成物流單頁面 - 保持原始格式
   function generateShippingPage(data, settings, customOrderNo) {
     if (!data) return '';
     
     const displayOrderNo = customOrderNo || data.orderNo;
-    const scale = settings.paper.scale / 100;
     
+    // 不使用縮放，讓物流單保持原始大小，並置中顯示
     return `
       <div class="bv-shipping-content" style="
-        width: 100mm;
-        height: 150mm;
+        width: ${settings.paper.width}mm;
+        height: ${settings.paper.height}mm;
         position: relative;
         overflow: hidden;
         background: white;
-        margin: 0;
-        padding: 0;
         display: flex;
         align-items: center;
         justify-content: center;
+        margin: 0;
+        padding: 0;
       ">
-        <!-- 底圖 -->
+        <!-- 底圖（最底層） -->
         ${settings.shipping.logo ? `
           <img src="${settings.shipping.logo}" 
                class="bv-watermark-logo"
@@ -1234,20 +1265,20 @@
                  --opacity: ${settings.shipping.logoOpacity / 100};
                  pointer-events: none;
                  z-index: 1;
+                 -webkit-print-color-adjust: exact;
+                 print-color-adjust: exact;
                ">
         ` : ''}
         
-        <!-- 物流單內容 -->
+        <!-- 物流單原始內容（中層） -->
         <div style="
-          transform: scale(${scale});
-          transform-origin: center center;
           z-index: 2;
           position: relative;
         ">
           ${data.html}
         </div>
         
-        <!-- 訂單編號標籤 -->
+        <!-- 訂單編號標籤（最上層） -->
         ${settings.showOrderNumber && displayOrderNo ? `
           <div style="
             position: absolute;
@@ -1260,9 +1291,12 @@
             border-radius: 4px;
             font-size: ${settings.orderLabelSize}px;
             font-weight: bold;
-            z-index: 100;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             white-space: nowrap;
             font-family: Arial, sans-serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           ">
             訂單編號：${displayOrderNo}
           </div>
