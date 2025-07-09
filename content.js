@@ -59,19 +59,31 @@
       const ctx = canvas.getContext('2d');
       const image = new Image();
       
+      // 重要：設定 crossOrigin
       image.crossOrigin = 'anonymous';
       
       image.onload = function() {
+        // 使用原始圖片尺寸
         canvas.width = image.naturalWidth || image.width;
         canvas.height = image.naturalHeight || image.height;
+        
+        // 繪製圖片
         ctx.drawImage(image, 0, 0);
         
         try {
+          // 轉換為 base64
           const dataURL = canvas.toDataURL('image/png');
           resolve(dataURL);
         } catch (e) {
           console.error('圖片轉換失敗:', e);
-          resolve(img.src); // 失敗時返回原始 src
+          // 如果轉換失敗，嘗試使用 JPEG 格式
+          try {
+            const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+            resolve(dataURL);
+          } catch (e2) {
+            console.error('JPEG 轉換也失敗:', e2);
+            resolve(img.src); // 最後返回原始 src
+          }
         }
       };
       
@@ -80,8 +92,13 @@
         resolve(img.src); // 失敗時返回原始 src
       };
       
-      // 設定 src 觸發載入
-      image.src = img.src;
+      // 對於 .ashx 動態圖片，確保完整的 URL
+      if (img.src.includes('.ashx')) {
+        const fullUrl = new URL(img.src, window.location.href).href;
+        image.src = fullUrl;
+      } else {
+        image.src = img.src;
+      }
     });
   }
   
@@ -176,26 +193,17 @@
     shippingData = [];
     
     if (currentPage.provider === 'seven') {
-      // 7-11 物流單抓取
+      // 7-11 物流單抓取 - 更精確的選擇器
       const frames = [];
       
-      // 方法1: 找 div_frame
+      // 找到所有的物流單框架
       document.querySelectorAll('.div_frame').forEach(frame => {
-        if (frame.textContent.includes('交貨便') && frame.textContent.includes('統一超商')) {
+        // 確保是物流單內容
+        if (frame.querySelector('img[src*="SendQRCode.ashx"]') || 
+            frame.querySelector('img[src*="QRCode.ashx"]')) {
           frames.push(frame);
         }
       });
-      
-      // 方法2: 找特定結構
-      if (frames.length === 0) {
-        document.querySelectorAll('div[style*="border: 2px solid"]').forEach(div => {
-          if (div.textContent.includes('交貨便') && 
-              div.textContent.includes('統一超商') &&
-              div.querySelector('img[src*="QRCode"]')) {
-            frames.push(div);
-          }
-        });
-      }
       
       console.log('找到的物流單框架數量:', frames.length);
       
@@ -209,20 +217,20 @@
           continue;
         }
         
-        const clone = frame.cloneNode(true);
+        // 創建包裝容器，保持原始尺寸
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'width: 300px; height: 450px; position: relative; margin: 0 auto;';
         
-        // 移除可能的空白元素
-        clone.querySelectorAll('*').forEach(element => {
-          if (element.innerHTML.trim() === '' && !element.querySelector('img')) {
-            element.remove();
-          }
-        });
+        const clone = frame.cloneNode(true);
         
         // 處理圖片轉為 base64
         await processImagesToBase64(clone);
         
+        // 將複製的內容放入包裝容器
+        wrapper.appendChild(clone);
+        
         // 只加入有實際內容的物流單
-        const htmlContent = clone.outerHTML.trim();
+        const htmlContent = wrapper.outerHTML;
         if (htmlContent && htmlContent.length > 100) {
           shippingData.push({
             html: htmlContent,
@@ -1051,10 +1059,6 @@
   function generateShippingPage(data, settings, orderNo) {
     if (!data || !data.html) return '';
     
-    // 清理HTML內容
-    let cleanedHtml = data.html;
-    cleanedHtml = cleanedHtml.replace(/>\s+</g, '><');
-    
     return `
       <div class="bv-shipping-content" style="
         width: ${settings.paper.width}mm;
@@ -1066,6 +1070,7 @@
         margin: 0;
         padding: 0;
       ">
+        <!-- Logo 底圖層 -->
         ${settings.shipping.logo ? `
           <div style="
             position: absolute;
@@ -1073,10 +1078,8 @@
             left: 0;
             right: 0;
             bottom: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             z-index: 1;
+            pointer-events: none;
           ">
             <img src="${settings.shipping.logo}" style="
               position: absolute;
@@ -1085,20 +1088,18 @@
               transform: translate(-50%, -50%);
               width: ${settings.shipping.logoSize}mm;
               opacity: ${settings.shipping.logoOpacity / 100};
-              pointer-events: none;
             ">
           </div>
         ` : ''}
         
+        <!-- 主要內容層 -->
         <div style="
           position: relative;
           width: 100%;
           height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
           z-index: 2;
         ">
+          <!-- 訂單編號標籤 -->
           ${settings.showOrderNumber && orderNo ? `
             <div style="
               position: absolute;
@@ -1111,7 +1112,7 @@
               border-radius: 4px;
               font-size: ${settings.orderLabelSize}px;
               font-weight: bold;
-              z-index: 1000;
+              z-index: 10;
               box-shadow: 0 2px 4px rgba(0,0,0,0.1);
               white-space: nowrap;
             ">
@@ -1119,16 +1120,15 @@
             </div>
           ` : ''}
           
+          <!-- 物流單內容 -->
           <div style="
-            transform: scale(${settings.paper.scale / 100});
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(${settings.paper.scale / 100});
             transform-origin: center center;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
           ">
-            ${cleanedHtml}
+            ${data.html}
           </div>
         </div>
       </div>
