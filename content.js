@@ -1247,7 +1247,6 @@
     return pages;
   }
   
-  // 修正 generateShippingPage 函數
   function generateShippingPage(data, settings, customOrderNo) {
     if (!data) return '';
     
@@ -1256,15 +1255,11 @@
     
     return `
       <div class="bv-shipping-content" style="
-        width: ${settings.paper.width}mm;
-        height: ${settings.paper.height}mm;
+        width: 100mm;
+        height: 150mm;
         position: relative;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        overflow: visible;
         background: white;
-        box-sizing: border-box;
         margin: 0;
         padding: 0;
       ">
@@ -1287,19 +1282,25 @@
                ">
         ` : ''}
         
-        <!-- 物流單內容（中層） -->
+        <!-- 物流單內容容器 -->
         <div style="
-          transform: scale(${settings.paper.scale / 100});
-          transform-origin: center center;
+          position: absolute;
+          top: 0;
+          left: 0;
           width: 100%;
           height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
-          position: relative;
           z-index: 2;
         ">
-          ${data.html}
+          <!-- 縮放的內容 -->
+          <div style="
+            transform: scale(${settings.paper.scale / 100});
+            transform-origin: center center;
+          ">
+            ${data.html}
+          </div>
         </div>
         
         <!-- 訂單編號標籤（最上層） -->
@@ -1318,6 +1319,8 @@
             z-index: 1000;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             white-space: nowrap;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           ">
             訂單編號：${displayOrderNo}
           </div>
@@ -1326,6 +1329,7 @@
     `;
   }
   
+  // 同樣修正 generateDetailPage 函數
   function generateDetailPage(data, settings) {
     if (!data || !data.orderInfo) return '';
     
@@ -1334,17 +1338,15 @@
     
     let html = `
       <div class="bv-detail-content" style="
-        width: ${settings.paper.width}mm;
-        height: ${settings.paper.height}mm;
+        width: 100mm;
+        height: 150mm;
         position: relative;
-        overflow: hidden;
+        overflow: visible;
         padding: ${settings.paper.margin}mm;
         font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
         font-size: ${settings.detail.textSize};
         box-sizing: border-box;
         background: white;
-        display: flex;
-        flex-direction: column;
         margin: 0;
       ">
         <!-- 底圖（最底層） -->
@@ -1369,94 +1371,93 @@
         <!-- 明細內容（上層） -->
         <div style="
           transform: scale(${settings.paper.scale / 100});
-          transform-origin: top left;
-          width: ${100 / (settings.paper.scale / 100)}%;
-          height: ${100 / (settings.paper.scale / 100)}%;
+          transform-origin: top center;
+          width: 100%;
           position: relative;
           z-index: 2;
         ">
-          <h2 style="text-align: center; margin: 0 0 15px 0; font-size: 24px;">出貨明細</h2>
+          <h2 style="text-align: center; margin: 0 0 10px 0; font-size: 20px;">出貨明細</h2>
           
-          <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: ${settings.detail.textSize};">
-            <div style="flex: 1; padding-right: 20px;">
-              <p style="margin: 3px 0;"><strong>訂單編號：</strong>${info.orderNo}</p>
-              <p style="margin: 3px 0;"><strong>訂購日期：</strong>${info.orderDate}</p>
-              <p style="margin: 3px 0;"><strong>訂購人：</strong>${fields.hideInfo ? maskName(info.customer) : info.customer}</p>
-              <p style="margin: 3px 0;"><strong>訂購人帳號：</strong>${info.customerAccount}</p>
-              <p style="margin: 3px 0;"><strong>聯絡電話：</strong>${fields.hideInfo ? maskPhone(info.phone) : info.phone}</p>
-              ${fields.showLogTraceId && data.logTraceId ? `<p style="margin: 3px 0;"><strong>物流編號：</strong>${data.logTraceId}</p>` : ''}
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: ${settings.detail.textSize};">
+            <div style="flex: 1; padding-right: 10px;">
+              <p style="margin: 2px 0;"><strong>訂單編號：</strong>${info.orderNo}</p>
+              <p style="margin: 2px 0;"><strong>訂購日期：</strong>${info.orderDate}</p>
+              <p style="margin: 2px 0;"><strong>訂購人：</strong>${fields.hideInfo ? maskName(info.customer) : info.customer}</p>
+              <p style="margin: 2px 0;"><strong>訂購人帳號：</strong>${info.customerAccount}</p>
+              <p style="margin: 2px 0;"><strong>聯絡電話：</strong>${fields.hideInfo ? maskPhone(info.phone) : info.phone}</p>
+              ${fields.showLogTraceId && data.logTraceId ? `<p style="margin: 2px 0;"><strong>物流編號：</strong>${data.logTraceId}</p>` : ''}
             </div>
             <div style="flex: 1;">
-              <p style="margin: 3px 0;"><strong>付款方式：</strong>${info.paymentMethod}</p>
-              <p style="margin: 3px 0;"><strong>送貨方式：</strong>${info.shippingMethod}</p>
-              <p style="margin: 3px 0;"><strong>收件人：</strong>${fields.hideInfo ? maskName(info.recipient) : info.recipient}</p>
-              <p style="margin: 3px 0;"><strong>收件人電話：</strong>${fields.hideInfo ? maskPhone(info.recipientPhone) : info.recipientPhone}</p>
-              <p style="margin: 3px 0;"><strong>送貨地址：</strong>${info.address}</p>
-              ${info.storeName ? `<p style="margin: 3px 0;"><strong>門市名稱：</strong>${info.storeName}</p>` : ''}
-              ${fields.deliveryTime && info.deliveryTime ? `<p style="margin: 3px 0;"><strong>指定配送時段：</strong>${info.deliveryTime}</p>` : ''}
-              ${fields.shippingTime && info.shippingTime ? `<p style="margin: 3px 0;"><strong>預計出貨日：</strong>${info.shippingTime}</p>` : ''}
+              <p style="margin: 2px 0;"><strong>付款方式：</strong>${info.paymentMethod}</p>
+              <p style="margin: 2px 0;"><strong>送貨方式：</strong>${info.shippingMethod}</p>
+              <p style="margin: 2px 0;"><strong>收件人：</strong>${fields.hideInfo ? maskName(info.recipient) : info.recipient}</p>
+              <p style="margin: 2px 0;"><strong>收件人電話：</strong>${fields.hideInfo ? maskPhone(info.recipientPhone) : info.recipientPhone}</p>
+              <p style="margin: 2px 0;"><strong>送貨地址：</strong>${info.address}</p>
+              ${info.storeName ? `<p style="margin: 2px 0;"><strong>門市名稱：</strong>${info.storeName}</p>` : ''}
+              ${fields.deliveryTime && info.deliveryTime ? `<p style="margin: 2px 0;"><strong>指定配送時段：</strong>${info.deliveryTime}</p>` : ''}
+              ${fields.shippingTime && info.shippingTime ? `<p style="margin: 2px 0;"><strong>預計出貨日：</strong>${info.shippingTime}</p>` : ''}
             </div>
           </div>
           
-          <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: ${settings.detail.textSize};">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: ${settings.detail.textSize};">
             <thead>
               <tr style="border-top: 2px solid black; border-bottom: 2px solid black;">
-                <th style="text-align: left; padding: 6px;">品名</th>
-                ${!fields.hidePrice ? '<th style="text-align: right; padding: 6px;">單價</th>' : ''}
-                <th style="text-align: center; padding: 6px;">數量</th>
-                ${!fields.hidePrice ? '<th style="text-align: right; padding: 6px;">小計</th>' : ''}
+                <th style="text-align: left; padding: 4px;">品名</th>
+                ${!fields.hidePrice ? '<th style="text-align: right; padding: 4px;">單價</th>' : ''}
+                <th style="text-align: center; padding: 4px;">數量</th>
+                ${!fields.hidePrice ? '<th style="text-align: right; padding: 4px;">小計</th>' : ''}
               </tr>
             </thead>
             <tbody>
               ${info.items.map(item => `
                 <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 6px;">
-                    ${fields.productImage && item.image ? `<img src="${item.image}" style="width: 40px; height: 40px; object-fit: cover; vertical-align: middle; margin-right: 8px;">` : ''}
+                  <td style="padding: 4px;">
+                    ${fields.productImage && item.image ? `<img src="${item.image}" style="width: 30px; height: 30px; object-fit: cover; vertical-align: middle; margin-right: 4px;">` : ''}
                     ${item.name}
                   </td>
-                  ${!fields.hidePrice ? `<td style="text-align: right; padding: 6px;">${item.price}</td>` : ''}
-                  <td style="text-align: center; padding: 6px;">${item.qty}</td>
-                  ${!fields.hidePrice ? `<td style="text-align: right; padding: 6px;">${item.subtotal}</td>` : ''}
+                  ${!fields.hidePrice ? `<td style="text-align: right; padding: 4px;">${item.price}</td>` : ''}
+                  <td style="text-align: center; padding: 4px;">${item.qty}</td>
+                  ${!fields.hidePrice ? `<td style="text-align: right; padding: 4px;">${item.subtotal}</td>` : ''}
                 </tr>
               `).join('')}
             </tbody>
           </table>
           
           ${!fields.hidePrice ? `
-            <table style="width: 100%; border-top: 1px solid black; border-bottom: 1px solid black; margin-top: 15px; font-size: ${settings.detail.textSize};">
+            <table style="width: 100%; border-top: 1px solid black; border-bottom: 1px solid black; margin-top: 10px; font-size: ${settings.detail.textSize};">
               <tr>
-                <td style="text-align: right; padding: 6px;">商品總數量：</td>
-                <td style="text-align: right; padding: 6px; width: 120px;">${info.totalQty}</td>
+                <td style="text-align: right; padding: 4px;">商品總數量：</td>
+                <td style="text-align: right; padding: 4px; width: 100px;">${info.totalQty}</td>
               </tr>
               ${info.extraShipping ? `
                 <tr>
-                  <td style="text-align: right; padding: 6px;">額外運費：</td>
-                  <td style="text-align: right; padding: 6px;">${info.extraShipping}</td>
+                  <td style="text-align: right; padding: 4px;">額外運費：</td>
+                  <td style="text-align: right; padding: 4px;">${info.extraShipping}</td>
                 </tr>
               ` : ''}
               <tr>
-                <td style="text-align: right; padding: 6px; font-weight: bold;">總計：</td>
-                <td style="text-align: right; padding: 6px; font-weight: bold;">${info.total}</td>
+                <td style="text-align: right; padding: 4px; font-weight: bold;">總計：</td>
+                <td style="text-align: right; padding: 4px; font-weight: bold;">${info.total}</td>
               </tr>
             </table>
           ` : ''}
           
           ${fields.remark && info.remark ? `
-            <div style="margin-top: 15px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+            <div style="margin-top: 10px; padding: 6px; background: #f5f5f5; border-radius: 4px;">
               <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">顧客備註</div>
               <div style="font-size: ${settings.detail.textSize};">${info.remark}</div>
             </div>
           ` : ''}
           
           ${fields.manageRemark && info.manageRemark ? `
-            <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+            <div style="margin-top: 6px; padding: 6px; background: #f5f5f5; border-radius: 4px;">
               <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">後台備註</div>
               <div style="font-size: ${settings.detail.textSize};">${info.manageRemark}</div>
             </div>
           ` : ''}
           
           ${fields.printRemark && info.printRemark ? `
-            <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+            <div style="margin-top: 6px; padding: 6px; background: #f5f5f5; border-radius: 4px;">
               <div style="background: #777; color: white; padding: 2px 6px; display: inline-block; margin-bottom: 4px; font-size: 12px;">列印備註</div>
               <div style="font-size: ${settings.detail.textSize};">${info.printRemark}</div>
             </div>
