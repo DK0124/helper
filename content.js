@@ -110,6 +110,7 @@
     }
   }
   
+  // 修正 fetchShippingData 函數
   function fetchShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
     btn.disabled = true;
@@ -143,7 +144,20 @@
       console.log('找到的物流單框架數量:', frames.length);
       
       frames.forEach((frame, index) => {
+        // 確保框架有內容
+        if (!frame || frame.innerHTML.trim() === '') {
+          console.log('跳過空白框架:', index);
+          return;
+        }
+        
         const clone = frame.cloneNode(true);
+        
+        // 移除可能的空白元素
+        clone.querySelectorAll('*').forEach(element => {
+          if (element.innerHTML.trim() === '' && !element.querySelector('img')) {
+            element.remove();
+          }
+        });
         
         // 處理圖片
         clone.querySelectorAll('img').forEach(img => {
@@ -152,18 +166,23 @@
           }
         });
         
-        shippingData.push({
-          html: clone.outerHTML,
-          index: index
-        });
+        // 只加入有實際內容的物流單
+        const htmlContent = clone.outerHTML.trim();
+        if (htmlContent && htmlContent.length > 100) { // 確保有足夠的內容
+          shippingData.push({
+            html: htmlContent,
+            index: index
+          });
+        }
       });
     }
     
-    // 儲存資料
+    // 儲存資料時加入時間戳記
     if (chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({ 
         bvShippingData: shippingData,
-        lastProvider: currentPage.provider 
+        lastProvider: currentPage.provider,
+        timestamp: Date.now()
       }, () => {
         btn.disabled = false;
         btn.innerHTML = '重新抓取物流單';
@@ -178,8 +197,6 @@
       });
     }
   }
-  
-  // === 明細頁面專用函數 ===
   
   function activateDetailPanel() {
     if (panelActive) return;
