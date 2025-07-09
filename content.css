@@ -917,16 +917,10 @@
     margin: 0;
   }
   
-  /* 重置body樣式 */
-  html {
+  /* 重置html和body樣式 */
+  html, body {
     margin: 0 !important;
     padding: 0 !important;
-  }
-  
-  body {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: white !important;
     width: 100% !important;
     height: 100% !important;
     overflow: visible !important;
@@ -938,82 +932,85 @@
     visibility: visible !important;
     margin: 0 !important;
     padding: 0 !important;
-    gap: 0 !important;
     width: 100% !important;
-    background: white !important;
   }
   
-  /* 每個頁面的列印設定 */
+  /* 每個頁面的列印設定 - 關鍵修正 */
   .bv-preview-page,
   .bv-print-page {
     page-break-after: always !important;
     page-break-inside: avoid !important;
     box-shadow: none !important;
     border: none !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     padding: 0 !important;
     position: relative !important;
     display: block !important;
     width: 100mm !important;
     height: 150mm !important;
-    max-width: 100mm !important;
-    max-height: 150mm !important;
-    min-width: 100mm !important;
-    min-height: 150mm !important;
-    overflow: hidden !important;
+    overflow: visible !important; /* 改為 visible */
     background: white !important;
+    transform: none !important; /* 確保沒有變形 */
   }
   
   .bv-preview-page:last-child {
     page-break-after: auto !important;
   }
   
-  /* 物流單內容列印樣式 */
+  /* 物流單內容列印樣式 - 關鍵修正 */
   .bv-shipping-content {
-    display: flex !important;
+    display: block !important; /* 改為 block */
     visibility: visible !important;
     margin: 0 !important;
     padding: 0 !important;
     page-break-inside: avoid !important;
     width: 100mm !important;
     height: 150mm !important;
-    max-width: 100mm !important;
-    max-height: 150mm !important;
-    min-width: 100mm !important;
-    min-height: 150mm !important;
+    position: relative !important;
+    overflow: visible !important;
+  }
+  
+  /* 物流單內容置中容器 */
+  .bv-shipping-content > div:not(.bv-watermark-logo) {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  
+  /* 原始物流單內容 */
+  .div_frame,
+  .bv-shipping-wrapper {
+    position: relative !important;
+    transform-origin: center center !important;
   }
   
   /* 明細內容列印樣式 */
   .bv-detail-content {
-    display: flex !important;
+    display: block !important;
     visibility: visible !important;
     margin: 0 !important;
     page-break-inside: avoid !important;
     width: 100mm !important;
     height: 150mm !important;
-    max-width: 100mm !important;
-    max-height: 150mm !important;
-    min-width: 100mm !important;
-    min-height: 150mm !important;
+    position: relative !important;
+    overflow: visible !important;
   }
   
-  /* 確保內容不會被截斷 */
-  .bv-shipping-content > div,
-  .bv-detail-content > div {
-    max-width: 100% !important;
-    max-height: 100% !important;
-  }
-  
-  /* 確保圖片在列印時正確顯示 - 包括底圖 */
+  /* 確保圖片在列印時正確顯示 */
   img {
     display: inline-block !important;
     visibility: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    opacity: 1 !important;
+    max-width: none !important;
   }
   
-  /* 底圖的淡化效果在列印時需要特別處理 */
+  /* 底圖的淡化效果 */
   .bv-watermark-logo {
     display: block !important;
     visibility: visible !important;
@@ -1021,9 +1018,11 @@
     print-color-adjust: exact !important;
     filter: opacity(var(--opacity)) !important;
     -webkit-filter: opacity(var(--opacity)) !important;
+    position: absolute !important;
+    pointer-events: none !important;
   }
   
-  /* 特別處理 QR Code 圖片 */
+  /* QR Code 特別處理 */
   img[src*="QRCode"],
   img[src*="qrcode"],
   img[src*="SendQRCode"] {
@@ -1033,13 +1032,16 @@
     transform: none !important;
     filter: none !important;
     -webkit-filter: none !important;
+    width: auto !important;
+    height: auto !important;
   }
   
-  /* 確保表格結構在列印時保持 */
+  /* 確保表格正確顯示 */
   table {
     display: table !important;
     visibility: visible !important;
     border-collapse: collapse !important;
+    width: 100% !important;
   }
   
   tr {
@@ -1050,35 +1052,20 @@
   td, th {
     display: table-cell !important;
     visibility: visible !important;
+    padding: 2px !important;
   }
   
-  /* 確保文字在列印時顯示 */
+  /* 文字樣式 */
   p, span, div, h1, h2, h3, h4, h5, h6 {
     visibility: visible !important;
     opacity: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
-  /* 物流單框架樣式 */
-  .div_frame,
-  .bv-shipping-wrapper {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-  
-  /* 確保背景色和邊框在列印時顯示 */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-  
-  /* 修正列印預覽的縮放問題 */
-  @media print and (min-resolution: 300dpi) {
-    .bv-preview-page,
-    .bv-print-page {
-      width: 100mm !important;
-      height: 150mm !important;
-    }
+  /* 訂單編號標籤確保顯示 */
+  div[style*="position: absolute"][style*="top:"] {
+    z-index: 9999 !important;
   }
 }
 
