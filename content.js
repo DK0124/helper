@@ -1847,4 +1847,142 @@
       }
       
       document.getElementById('bv-detail-text-size').value = settings.detail.textSize;
-      document.getElementById('bv-detail-logo-size').value = settings.detail
+      document.getElementById('bv-detail-logo-size').value = settings.detail.logoSize;
+      document.getElementById('bv-detail-logo-x').value = settings.detail.logoX;
+      document.getElementById('bv-detail-logo-y').value = settings.detail.logoY;
+      document.getElementById('bv-detail-logo-opacity').value = settings.detail.logoOpacity;
+      ['detail-logo-size', 'detail-logo-x', 'detail-logo-y', 'detail-logo-opacity'].forEach(id => {
+        updateValueDisplay(id);
+        const element = document.getElementById('bv-' + id);
+        if (element) updateRangeProgress(element);
+      });
+    }
+    
+    // 載入欄位設定
+    if (settings.fields) {
+      Object.keys(settings.fields).forEach(field => {
+        const checkbox = document.getElementById('field-' + field);
+        if (checkbox) checkbox.checked = settings.fields[field];
+      });
+    }
+    
+    // 更新訂單標籤控制顯示
+    const controls = document.getElementById('bv-order-label-controls');
+    if (controls) {
+      controls.style.display = settings.showOrderNumber ? 'block' : 'none';
+    }
+    
+    saveSettings();
+    updatePreview();
+  }
+  
+  function getDefaultSettings() {
+    return {
+      paper: {
+        width: 100,
+        height: 150,
+        scale: 100,
+        margin: 5
+      },
+      showOrderNumber: true,
+      orderLabelTop: 5,
+      orderLabelSize: 14,
+      shipping: {
+        logo: null,
+        logoSize: 30,
+        logoX: 50,
+        logoY: 50,
+        logoOpacity: 20
+      },
+      detail: {
+        textSize: '14px',
+        logo: null,
+        logoSize: 50,
+        logoX: 50,
+        logoY: 50,
+        logoOpacity: 20
+      },
+      fields: {
+        productImage: false,
+        remark: false,
+        manageRemark: false,
+        printRemark: true,
+        deliveryTime: false,
+        shippingTime: true,
+        hideInfo: true,
+        hidePrice: true
+      }
+    };
+  }
+  
+  function showNotification(message, type = 'info') {
+    // 對物流單頁面，使用簡單的通知方式
+    if (currentPage.type === 'shipping') {
+      console.log(`[${type.toUpperCase()}] ${message}`);
+      alert(message);
+      return;
+    }
+    
+    // 對明細頁面，使用視覺化通知
+    const notification = document.createElement('div');
+    notification.className = `bv-notification ${type}`;
+    notification.innerHTML = `
+      <span class="material-icons">${
+        type === 'success' ? 'check_circle' : 
+        type === 'warning' ? 'warning' : 
+        type === 'error' ? 'error' : 
+        'info'
+      }</span>
+      <span>${message}</span>
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.classList.add('show'), 10);
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
+  }
+  
+  // === 主程式執行 ===
+  
+  // 修改主程式執行部分，加入錯誤處理
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      try {
+        if (request.action === 'togglePanel') {
+          if (currentPage.type === 'detail') {
+            if (panelActive) {
+              deactivateDetailPanel();
+            } else {
+              activateDetailPanel();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('處理訊息時發生錯誤:', error);
+      }
+      return true; // 保持訊息通道開啟
+    });
+  }
+
+  // 在初始化前檢查
+  if (currentPage.type === 'shipping') {
+    // 物流單頁自動顯示面板
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        if (checkExtensionValid()) {
+          setTimeout(injectShippingPanel, 300);
+        }
+      });
+    } else {
+      if (checkExtensionValid()) {
+        setTimeout(injectShippingPanel, 300);
+      }
+    }
+  } else if (currentPage.type === 'detail') {
+    // 明細頁等待使用者啟動
+    console.log('BV SHOP 出貨明細頁面已偵測，點擊擴充功能圖示以啟動');
+  }
+  
+})();
