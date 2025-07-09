@@ -1,4 +1,4 @@
-// BV SHOP 出貨助手 - 內容腳本 (完整版 - 支援多種圖片格式)
+// BV SHOP 出貨助手 - 內容腳本 (完整版 - 支援物流編號比對)
 (function() {
   'use strict';
   
@@ -249,11 +249,12 @@
           
           wrapper.appendChild(clone);
           
-          // 提取訂單編號 - 使用更安全的方式
+          // 提取訂單編號和服務代碼
           let orderNo = '';
+          let serviceCode = '';
           const text = clone.textContent || '';
           
-          // 使用更簡單的字串搜尋方式
+          // 提取訂單編號
           if (text.includes('寄件訂單編號')) {
             const startIdx = text.indexOf('寄件訂單編號');
             const subText = text.substring(startIdx);
@@ -278,11 +279,24 @@
             }
           }
           
-          console.log(`物流單 ${index + 1} - 訂單編號: ${orderNo || '未找到'}`);
+          // 提取服務代碼 (物流編號)
+          const serviceCodeElement = clone.querySelector('span[id*="lblC2BPinCode"]');
+          if (serviceCodeElement) {
+            serviceCode = serviceCodeElement.textContent.trim();
+          } else {
+            // 嘗試其他方式提取
+            const codeMatch = text.match(/[A-Z]\d{11}/);
+            if (codeMatch) {
+              serviceCode = codeMatch[0];
+            }
+          }
+          
+          console.log(`物流單 ${index + 1} - 訂單編號: ${orderNo || '未找到'}, 服務代碼: ${serviceCode || '未找到'}`);
           
           shippingData.push({
             html: wrapper.outerHTML,
             orderNo: orderNo,
+            serviceCode: serviceCode,
             index: index
           });
         } catch (error) {
@@ -668,14 +682,42 @@
             <div class="bv-control-group">
               <div class="bv-control-group-title">顯示設定</div>
               <div class="bv-field-list">
-                <label><input type="checkbox" id="field-productImage"> 顯示商品圖片</label>
-                <label><input type="checkbox" id="field-remark"> 顯示顧客備註</label>
-                <label><input type="checkbox" id="field-manageRemark"> 顯示後台備註</label>
-                <label><input type="checkbox" id="field-printRemark" checked> 顯示列印備註</label>
-                <label><input type="checkbox" id="field-deliveryTime"> 顯示指定配送時段</label>
-                <label><input type="checkbox" id="field-shippingTime" checked> 顯示預計出貨日</label>
-                <label><input type="checkbox" id="field-hideInfo" checked> 隱藏個人資訊</label>
-                <label><input type="checkbox" id="field-hidePrice" checked> 隱藏價格</label>
+                <div class="bv-field-item">
+                  <input type="checkbox" id="bv-field-productImage">
+                  <label for="bv-field-productImage" class="bv-field-label">顯示商品圖片</label>
+                </div>
+                <div class="bv-field-item">
+                  <input type="checkbox" id="bv-field-remark">
+                  <label for="bv-field-remark" class="bv-field-label">顯示顧客備註</label>
+                </div>
+                <div class="bv-field-item">
+                  <input type="checkbox" id="bv-field-manageRemark">
+                  <label for="bv-field-manageRemark" class="bv-field-label">顯示後台備註</label>
+                </div>
+                <div class="bv-field-item">
+                  <input type="checkbox" id="bv-field-printRemark" checked>
+                  <label for="bv-field-printRemark" class="bv-field-label">顯示列印備註</label>
+                </div>
+                <div class="bv-field-item">
+                  <input type="checkbox" id="bv-field-deliveryTime">
+                  <label for="bv-field-deliveryTime" class="bv-field-label">顯示指定配送時段</label>
+                </div>
+                <div class="bv-field-item">
+                  <input type="checkbox" id="bv-field-shippingTime" checked>
+                  <label for="bv-field-shippingTime" class="bv-field-label">顯示預計出貨日</label>
+                </div>
+                <div class="bv-field-item">
+                  <input type="checkbox" id="bv-field-hideInfo" checked>
+                  <label for="bv-field-hideInfo" class="bv-field-label">隱藏個人資訊</label>
+                </div>
+                <div class="bv-field-item">
+                  <input type="checkbox" id="bv-field-hidePrice" checked>
+                  <label for="bv-field-hidePrice" class="bv-field-label">隱藏價格</label>
+                </div>
+                <div class="bv-field-item">
+                  <input type="checkbox" id="bv-field-showLogTraceId" checked>
+                  <label for="bv-field-showLogTraceId" class="bv-field-label">顯示物流編號</label>
+                </div>
               </div>
             </div>
             
@@ -740,12 +782,12 @@
                 <span>列印順序</span>
               </div>
               <select id="bv-print-order" class="bv-select">
-                <option value="sequential">依序交錯</option>
-                <option value="reverse">反序交錯</option>
-                <option value="shipping-only">純印物流單（正序）</option>
-                <option value="shipping-only-reverse">純印物流單（反序）</option>
-                <option value="detail-only">純印出貨明細（正序）</option>
-                <option value="detail-only-reverse">純印出貨明細（反序）</option>
+                <option value="paired-sequential">物流單-出貨明細（正序）</option>
+                <option value="paired-reverse">物流單-出貨明細（反序）</option>
+                <option value="shipping-only">純物流單（正序）</option>
+                <option value="shipping-only-reverse">純物流單（反序）</option>
+                <option value="detail-only">純出貨明細（正序）</option>
+                <option value="detail-only-reverse">純出貨明細（反序）</option>
               </select>
             </div>
           </div>
@@ -863,12 +905,25 @@
       // 提取訂單資訊
       const orderInfo = extractDetailOrderInfo(clone);
       
+      // 提取物流編號
+      let logTraceId = '';
+      const logTraceElement = clone.querySelector('.showLogTraceID');
+      if (logTraceElement) {
+        const match = logTraceElement.textContent.match(/物流編號[:\s]*([A-Z]\d{11})/);
+        if (match) {
+          logTraceId = match[1];
+        }
+      }
+      
       detailData.push({
         html: clone.innerHTML,
         orderNo: orderInfo.orderNo,
         orderInfo: orderInfo,
+        logTraceId: logTraceId,
         index: index
       });
+      
+      console.log(`明細 ${index + 1} - 訂單編號: ${orderInfo.orderNo}, 物流編號: ${logTraceId}`);
     });
     
     console.log('抓取到的明細數量:', detailData.length);
@@ -1087,7 +1142,7 @@
     if (!container) return;
     
     const settings = getSettings();
-    const printOrder = document.getElementById('bv-print-order')?.value || 'sequential';
+    const printOrder = document.getElementById('bv-print-order')?.value || 'paired-sequential';
     const pages = generatePages(printOrder, settings);
     
     container.innerHTML = '';
@@ -1098,52 +1153,76 @@
     const pages = [];
     let pageOrder = [];
     
-    // 根據列印順序產生頁面順序
-    const shippingLength = shippingData.length;
-    const detailLength = detailData.length;
-    const maxLength = Math.max(shippingLength, detailLength);
+    // 根據物流編號建立配對關係
+    const pairMap = new Map();
     
+    // 建立物流單的映射 (serviceCode -> shippingData)
+    const shippingMap = new Map();
+    shippingData.forEach(data => {
+      if (data.serviceCode) {
+        shippingMap.set(data.serviceCode, data);
+      }
+    });
+    
+    // 根據列印順序產生頁面順序
     switch (printOrder) {
-      case 'sequential': // 依序交錯: 物1明1, 物2明2, 物3明3
-        for (let i = 0; i < maxLength; i++) {
-          if (i < shippingLength) pageOrder.push({ type: 'shipping', index: i });
-          if (i < detailLength) pageOrder.push({ type: 'detail', index: i });
-        }
+      case 'paired-sequential': // 物流單-出貨明細（正序）
+        detailData.forEach((detail, index) => {
+          if (detail.logTraceId && shippingMap.has(detail.logTraceId)) {
+            // 找到配對的物流單
+            const shipping = shippingMap.get(detail.logTraceId);
+            pageOrder.push({ type: 'shipping', data: shipping });
+            pageOrder.push({ type: 'detail', data: detail });
+          } else {
+            // 沒有配對，只印明細
+            console.warn(`明細 ${detail.orderNo} 找不到對應的物流單 (物流編號: ${detail.logTraceId})`);
+            pageOrder.push({ type: 'detail', data: detail });
+          }
+        });
         break;
         
-      case 'reverse': // 反序交錯: 物3明1, 物2明2, 物1明3
-        for (let i = 0; i < maxLength; i++) {
-          const shippingIndex = shippingLength - 1 - i;
-          if (shippingIndex >= 0) pageOrder.push({ type: 'shipping', index: shippingIndex });
-          if (i < detailLength) pageOrder.push({ type: 'detail', index: i });
-        }
+      case 'paired-reverse': // 物流單-出貨明細（反序）
+        const reversedDetails = [...detailData].reverse();
+        reversedDetails.forEach((detail, index) => {
+          if (detail.logTraceId && shippingMap.has(detail.logTraceId)) {
+            // 找到配對的物流單
+            const shipping = shippingMap.get(detail.logTraceId);
+            pageOrder.push({ type: 'shipping', data: shipping });
+            pageOrder.push({ type: 'detail', data: detail });
+          } else {
+            // 沒有配對，只印明細
+            console.warn(`明細 ${detail.orderNo} 找不到對應的物流單 (物流編號: ${detail.logTraceId})`);
+            pageOrder.push({ type: 'detail', data: detail });
+          }
+        });
         break;
         
-      case 'shipping-only': // 純印物流單（正序）
-        for (let i = 0; i < shippingLength; i++) {
-          pageOrder.push({ type: 'shipping', index: i });
-        }
+      case 'shipping-only': // 純物流單（正序）
+        shippingData.forEach(data => {
+          pageOrder.push({ type: 'shipping', data: data });
+        });
         break;
         
-      case 'shipping-only-reverse': // 純印物流單（反序）
-        for (let i = shippingLength - 1; i >= 0; i--) {
-          pageOrder.push({ type: 'shipping', index: i });
-        }
+      case 'shipping-only-reverse': // 純物流單（反序）
+        [...shippingData].reverse().forEach(data => {
+          pageOrder.push({ type: 'shipping', data: data });
+        });
         break;
         
-      case 'detail-only': // 純印出貨明細（正序）
-        for (let i = 0; i < detailLength; i++) {
-          pageOrder.push({ type: 'detail', index: i });
-        }
+      case 'detail-only': // 純出貨明細（正序）
+        detailData.forEach(data => {
+          pageOrder.push({ type: 'detail', data: data });
+        });
         break;
         
-      case 'detail-only-reverse': // 純印出貨明細（反序）
-        for (let i = detailLength - 1; i >= 0; i--) {
-          pageOrder.push({ type: 'detail', index: i });
-        }
+      case 'detail-only-reverse': // 純出貨明細（反序）
+        [...detailData].reverse().forEach(data => {
+          pageOrder.push({ type: 'detail', data: data });
+        });
         break;
     }
     
+    // 產生頁面
     pageOrder.forEach(item => {
       const page = document.createElement('div');
       page.className = 'bv-preview-page bv-print-page';
@@ -1153,12 +1232,9 @@
       page.style.height = settings.paper.height + 'mm';
       
       if (item.type === 'shipping') {
-        // 取得對應的明細訂單編號
-        const detailInfo = detailData[item.index];
-        const orderNo = detailInfo ? detailInfo.orderNo : (shippingData[item.index] ? shippingData[item.index].orderNo : '');
-        page.innerHTML = generateShippingPage(shippingData[item.index], settings, orderNo);
+        page.innerHTML = generateShippingPage(item.data, settings);
       } else {
-        page.innerHTML = generateDetailPage(detailData[item.index], settings);
+        page.innerHTML = generateDetailPage(item.data, settings);
       }
       
       pages.push(page);
@@ -1167,7 +1243,7 @@
     return pages;
   }
   
-  function generateShippingPage(data, settings, orderNo) {
+  function generateShippingPage(data, settings) {
     if (!data) return '';
     
     return `
@@ -1219,7 +1295,7 @@
         </div>
         
         <!-- 訂單編號標籤（最上層） -->
-        ${settings.showOrderNumber && orderNo ? `
+        ${settings.showOrderNumber && data.orderNo ? `
           <div style="
             position: absolute;
             top: ${settings.orderLabelTop}mm;
@@ -1235,7 +1311,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             white-space: nowrap;
           ">
-            訂單編號：${orderNo}
+            訂單編號：${data.orderNo}
           </div>
         ` : ''}
       </div>
@@ -1300,6 +1376,7 @@
               <p style="margin: 3px 0;"><strong>訂購人：</strong>${fields.hideInfo ? maskName(info.customer) : info.customer}</p>
               <p style="margin: 3px 0;"><strong>訂購人帳號：</strong>${info.customerAccount}</p>
               <p style="margin: 3px 0;"><strong>聯絡電話：</strong>${fields.hideInfo ? maskPhone(info.phone) : info.phone}</p>
+              ${fields.showLogTraceId && data.logTraceId ? `<p style="margin: 3px 0;"><strong>物流編號：</strong>${data.logTraceId}</p>` : ''}
             </div>
             <div style="flex: 1;">
               <p style="margin: 3px 0;"><strong>付款方式：</strong>${info.paymentMethod}</p>
@@ -1461,7 +1538,7 @@
   function getFieldSettings() {
     const fields = {};
     document.querySelectorAll('.bv-field-list input').forEach(checkbox => {
-      const fieldName = checkbox.id.replace('field-', '');
+      const fieldName = checkbox.id.replace('bv-field-', '');
       fields[fieldName] = checkbox.checked;
     });
     return fields;
@@ -1542,7 +1619,7 @@
         
         if (result.bvFieldSettings) {
           Object.keys(result.bvFieldSettings).forEach(field => {
-            const checkbox = document.getElementById('field-' + field);
+            const checkbox = document.getElementById('bv-field-' + field);
             if (checkbox) checkbox.checked = result.bvFieldSettings[field];
           });
         }
@@ -1821,7 +1898,7 @@
     return {
       ...settings,
       fields: fieldSettings,
-      version: '2.1.0' // 更新版本號
+      version: '2.2.0' // 更新版本號以支援物流編號配對
     };
   }
   
@@ -1912,7 +1989,7 @@
     // 載入欄位設定
     if (settings.fields) {
       Object.keys(settings.fields).forEach(field => {
-        const checkbox = document.getElementById('field-' + field);
+        const checkbox = document.getElementById('bv-field-' + field);
         if (checkbox) checkbox.checked = settings.fields[field];
       });
     }
@@ -1961,7 +2038,8 @@
         deliveryTime: false,
         shippingTime: true,
         hideInfo: true,
-        hidePrice: true
+        hidePrice: true,
+        showLogTraceId: true
       }
     };
   }
@@ -1997,26 +2075,6 @@
   
   // === 主程式執行 ===
   
-  // 修改主程式執行部分，加入錯誤處理
-  if (chrome.runtime && chrome.runtime.onMessage) {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      try {
-        if (request.action === 'togglePanel') {
-          if (currentPage.type === 'detail') {
-            if (panelActive) {
-              deactivateDetailPanel();
-            } else {
-              activateDetailPanel();
-            }
-          }
-        }
-      } catch (error) {
-        console.error('處理訊息時發生錯誤:', error);
-      }
-      return true; // 保持訊息通道開啟
-    });
-  }
-
   // 在初始化前檢查
   if (currentPage.type === 'shipping') {
     // 物流單頁自動顯示面板
