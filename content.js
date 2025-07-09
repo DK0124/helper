@@ -4,6 +4,13 @@
   
   console.log('BV SHOP 出貨助手已載入');
   
+  // 全域變數（提前定義）
+  let currentPage = detectCurrentPage();
+  let shippingData = [];
+  let detailData = [];
+  let savedLogos = { shipping: null, detail: null };
+  let panelActive = false;
+  
   // 立即通知 background script
   if (chrome.runtime && chrome.runtime.sendMessage) {
     try {
@@ -13,9 +20,11 @@
     }
   }
   
-  // 設定訊息監聽器（必須在最前面）
+  // 設定訊息監聽器（在全域變數定義之後）
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      console.log('收到訊息:', request.action);
+      
       // 回應 ping
       if (request.action === 'ping') {
         sendResponse({ status: 'pong' });
@@ -31,28 +40,32 @@
             } else {
               activateDetailPanel();
             }
+            sendResponse({ status: 'success' });
+          } else if (currentPage.type === 'shipping') {
+            // 物流單頁面不需要切換，但回應成功
+            sendResponse({ status: 'success', message: 'Shipping page panel is always visible' });
+          } else {
+            sendResponse({ status: 'error', message: 'Unsupported page type' });
           }
-          sendResponse({ status: 'success' });
         } catch (error) {
           console.error('處理訊息時發生錯誤:', error);
           sendResponse({ status: 'error', message: error.message });
         }
         return true;
       }
+      
+      // 未知的 action
+      sendResponse({ status: 'unknown action' });
+      return true;
     });
   }
-
-  // 全域變數
-  let currentPage = detectCurrentPage();
-  let shippingData = [];
-  let detailData = [];
-  let savedLogos = { shipping: null, detail: null };
-  let panelActive = false;
   
   // 偵測當前頁面類型
   function detectCurrentPage() {
     const hostname = window.location.hostname;
     const pathname = window.location.pathname;
+    
+    console.log('偵測頁面 - hostname:', hostname, 'pathname:', pathname);
     
     // 7-11 物流單頁面
     if (hostname.includes('myship.7-11.com.tw') || 
