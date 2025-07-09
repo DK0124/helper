@@ -1149,6 +1149,7 @@
     pages.forEach(page => container.appendChild(page));
   }
   
+  // 修正 generatePages 函數中的配對邏輯
   function generatePages(printOrder, settings) {
     const pages = [];
     let pageOrder = [];
@@ -1171,7 +1172,8 @@
           if (detail.logTraceId && shippingMap.has(detail.logTraceId)) {
             // 找到配對的物流單
             const shipping = shippingMap.get(detail.logTraceId);
-            pageOrder.push({ type: 'shipping', data: shipping });
+            // 使用明細的訂單編號
+            pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
             pageOrder.push({ type: 'detail', data: detail });
           } else {
             // 沒有配對，只印明細
@@ -1187,7 +1189,8 @@
           if (detail.logTraceId && shippingMap.has(detail.logTraceId)) {
             // 找到配對的物流單
             const shipping = shippingMap.get(detail.logTraceId);
-            pageOrder.push({ type: 'shipping', data: shipping });
+            // 使用明細的訂單編號
+            pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
             pageOrder.push({ type: 'detail', data: detail });
           } else {
             // 沒有配對，只印明細
@@ -1232,7 +1235,8 @@
       page.style.height = settings.paper.height + 'mm';
       
       if (item.type === 'shipping') {
-        page.innerHTML = generateShippingPage(item.data, settings);
+        // 傳遞自訂的訂單編號（如果有的話）
+        page.innerHTML = generateShippingPage(item.data, settings, item.orderNo);
       } else {
         page.innerHTML = generateDetailPage(item.data, settings);
       }
@@ -1243,8 +1247,12 @@
     return pages;
   }
   
-  function generateShippingPage(data, settings) {
+  // 修正 generateShippingPage 函數
+  function generateShippingPage(data, settings, customOrderNo) {
     if (!data) return '';
+    
+    // 優先使用傳入的自訂訂單編號（來自明細），否則使用物流單本身的訂單編號
+    const displayOrderNo = customOrderNo || data.orderNo;
     
     return `
       <div class="bv-shipping-content" style="
@@ -1295,7 +1303,7 @@
         </div>
         
         <!-- 訂單編號標籤（最上層） -->
-        ${settings.showOrderNumber && data.orderNo ? `
+        ${settings.showOrderNumber && displayOrderNo ? `
           <div style="
             position: absolute;
             top: ${settings.orderLabelTop}mm;
@@ -1311,7 +1319,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             white-space: nowrap;
           ">
-            訂單編號：${data.orderNo}
+            訂單編號：${displayOrderNo}
           </div>
         ` : ''}
       </div>
