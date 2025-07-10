@@ -1450,40 +1450,77 @@
       return;
     }
     
-    // 移除之前的列印樣式
-    const existingStyle = document.getElementById('bv-print-specific-styles');
-    if (existingStyle) {
-      existingStyle.remove();
+    // 找到所有的 style 標籤並暫時修改它們
+    const originalStyles = [];
+    const styleElements = document.querySelectorAll('style');
+    
+    styleElements.forEach((style, index) => {
+      const originalText = style.textContent;
+      originalStyles.push({
+        element: style,
+        originalText: originalText
+      });
+      
+      // 如果包含 @page 規則，暫時註解掉
+      if (originalText.includes('@page')) {
+        style.textContent = originalText.replace(/@page\s*{[^}]*}/g, '/* @page disabled by BV */');
+      }
+      
+      // 如果包含影響 body 寬度的規則，也註解掉
+      if (originalText.includes('body') && originalText.includes('width: 20cm')) {
+        style.textContent = style.textContent.replace(/body\s*{[^}]*width:\s*20cm[^}]*}/g, function(match) {
+          return match.replace('width: 20cm', '/* width: 20cm */');
+        });
+      }
+    });
+    
+    // 創建我們的列印樣式，使用 ID 選擇器提高優先級
+    let printStyleElement = document.getElementById('bv-print-specific-styles');
+    if (printStyleElement) {
+      printStyleElement.remove();
     }
     
-    // 添加列印專用樣式 - 強制覆蓋所有原始樣式
-    const printStyleElement = document.createElement('style');
+    printStyleElement = document.createElement('style');
     printStyleElement.id = 'bv-print-specific-styles';
     printStyleElement.textContent = `
-      /* 強制覆蓋原始的列印樣式 */
+      /* 最高優先級的列印樣式 */
       @media print {
-        /* 最高優先級的頁面設定 */
+        /* 強制頁面設定 - 使用多個 @page 規則確保生效 */
         @page {
           size: 100mm 150mm !important;
           margin: 0 !important;
         }
         
-        /* 覆蓋所有 html 和 body 的設定 */
+        @page :first {
+          size: 100mm 150mm !important;
+          margin: 0 !important;
+        }
+        
+        @page :left {
+          size: 100mm 150mm !important;
+          margin: 0 !important;
+        }
+        
+        @page :right {
+          size: 100mm 150mm !important;
+          margin: 0 !important;
+        }
+        
+        /* 使用 ID 選擇器提高優先級 */
+        html#bv-print-override,
         html {
           width: auto !important;
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
-          font-size: 16px !important;
         }
         
+        body#bv-print-body-override,
         body {
           width: auto !important;
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
-          overflow: visible !important;
-          /* 移除原始的 20cm 寬度限制 */
           max-width: none !important;
           min-width: auto !important;
         }
@@ -1497,6 +1534,8 @@
         body > *:not(#bv-preview-container) {
           display: none !important;
           visibility: hidden !important;
+          height: 0 !important;
+          overflow: hidden !important;
         }
         
         /* 只顯示預覽容器 */
@@ -1504,12 +1543,15 @@
           display: block !important;
           visibility: visible !important;
           width: auto !important;
+          height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
           position: static !important;
         }
         
-        /* 每頁固定 100mm x 150mm */
+        /* 每頁固定 100mm x 150mm - 使用多重選擇器 */
+        #bv-preview-container .bv-preview-page,
+        #bv-preview-container .bv-print-page,
         .bv-preview-page,
         .bv-print-page {
           display: block !important;
@@ -1520,7 +1562,7 @@
           min-height: 150mm !important;
           max-width: 100mm !important;
           max-height: 150mm !important;
-          margin: 0 !important;
+          margin: 0 auto !important;
           padding: 0 !important;
           page-break-after: always !important;
           page-break-inside: avoid !important;
@@ -1532,11 +1574,14 @@
           box-shadow: none !important;
         }
         
-        .bv-preview-page:last-child {
+        #bv-preview-container .bv-preview-page:last-child,
+        #bv-preview-container .bv-print-page:last-child {
           page-break-after: auto !important;
         }
         
         /* 內容容器也固定尺寸 */
+        #bv-preview-container .bv-shipping-content,
+        #bv-preview-container .bv-detail-content,
         .bv-shipping-content,
         .bv-detail-content {
           display: block !important;
@@ -1562,48 +1607,32 @@
           color-adjust: exact !important;
         }
         
-        /* 確保所有內容可見 */
+        /* 確保所有預覽內容可見 */
+        #bv-preview-container *,
         .bv-preview-page *,
         .bv-print-page * {
           visibility: visible !important;
         }
-        
-        /* 隱藏底圖外的其他元素 */
-        .bv-watermark-logo {
-          opacity: var(--opacity) !important;
-        }
-      }
-      
-      /* 添加到普通樣式區，避免被覆蓋 */
-      @media all {
-        #bv-print-specific-styles {
-          display: none !important;
-        }
       }
     `;
     
-    // 插入到 head 最後，確保優先級最高
-    document.head.appendChild(printStyleElement);
+    // 插入到 head 最前面，確保最後載入
+    document.head.insertBefore(printStyleElement, document.head.firstChild);
     
-    // 暫時移除原始的 style 標籤
-    const originalStyles = document.querySelectorAll('style');
-    const styleStates = [];
-    originalStyles.forEach(style => {
-      if (style.id !== 'bv-print-specific-styles' && style.textContent.includes('@page')) {
-        styleStates.push({
-          element: style,
-          disabled: style.disabled
-        });
-        style.disabled = true;
-      }
-    });
+    // 添加臨時 ID 以提高優先級
+    document.documentElement.id = 'bv-print-override';
+    document.body.id = 'bv-print-body-override';
     
     // 延遲執行列印
     setTimeout(() => {
       window.print();
       
-      // 列印後恢復原始樣式
+      // 列印後清理
       setTimeout(() => {
+        // 移除臨時 ID
+        document.documentElement.removeAttribute('id');
+        document.body.removeAttribute('id');
+        
         // 移除我們的列印樣式
         const tempStyle = document.getElementById('bv-print-specific-styles');
         if (tempStyle) {
@@ -1611,8 +1640,8 @@
         }
         
         // 恢復原始樣式
-        styleStates.forEach(state => {
-          state.element.disabled = state.disabled;
+        originalStyles.forEach(item => {
+          item.element.textContent = item.originalText;
         });
       }, 2000);
     }, 100);
