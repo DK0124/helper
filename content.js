@@ -1253,7 +1253,7 @@ async function loadImageAsDataURL(url, imgElement) {
     container.innerHTML = '';
     pages.forEach(page => container.appendChild(page));
   }
-  
+    
   function generatePages(printOrder, settings) {
     const pages = [];
     let pageOrder = [];
@@ -1261,11 +1261,14 @@ async function loadImageAsDataURL(url, imgElement) {
     // 根據物流編號建立配對關係
     const pairMap = new Map();
     
-    // 建立物流單的映射 (serviceCode -> shippingData)
+    // 建立物流單的映射 - 注意這裡要處理編號格式
     const shippingMap = new Map();
     shippingData.forEach(data => {
       if (data.serviceCode) {
-        shippingMap.set(data.serviceCode, data);
+        // 標準化物流編號格式
+        const normalizedCode = normalizeServiceCode(data.serviceCode);
+        shippingMap.set(normalizedCode, data);
+        console.log(`物流單編號: ${data.serviceCode} -> 標準化: ${normalizedCode}`);
       }
     });
     
@@ -1273,15 +1276,38 @@ async function loadImageAsDataURL(url, imgElement) {
     switch (printOrder) {
       case 'paired-sequential': // 物流單-出貨明細（正序）
         detailData.forEach((detail, index) => {
-          if (detail.logTraceId && shippingMap.has(detail.logTraceId)) {
-            // 找到配對的物流單
-            const shipping = shippingMap.get(detail.logTraceId);
-            // 使用明細的訂單編號
-            pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
-            pageOrder.push({ type: 'detail', data: detail });
+          if (detail.logTraceId) {
+            // 標準化明細的物流編號
+            const normalizedDetailCode = normalizeServiceCode(detail.logTraceId);
+            console.log(`明細物流編號: ${detail.logTraceId} -> 標準化: ${normalizedDetailCode}`);
+            
+            if (shippingMap.has(normalizedDetailCode)) {
+              // 找到配對的物流單
+              const shipping = shippingMap.get(normalizedDetailCode);
+              console.log(`成功配對: 明細 ${detail.orderNo} <-> 物流單`);
+              pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
+              pageOrder.push({ type: 'detail', data: detail });
+            } else {
+              // 嘗試其他匹配方式
+              let matched = false;
+              for (const [code, shipping] of shippingMap) {
+                if (code.includes(normalizedDetailCode) || normalizedDetailCode.includes(code)) {
+                  console.log(`模糊配對成功: 明細 ${detail.orderNo} <-> 物流單`);
+                  pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
+                  pageOrder.push({ type: 'detail', data: detail });
+                  matched = true;
+                  break;
+                }
+              }
+              
+              if (!matched) {
+                console.warn(`明細 ${detail.orderNo} 找不到對應的物流單 (物流編號: ${detail.logTraceId})`);
+                pageOrder.push({ type: 'detail', data: detail });
+              }
+            }
           } else {
-            // 沒有配對，只印明細
-            console.warn(`明細 ${detail.orderNo} 找不到對應的物流單 (物流編號: ${detail.logTraceId})`);
+            // 沒有物流編號，只印明細
+            console.log(`明細 ${detail.orderNo} 沒有物流編號`);
             pageOrder.push({ type: 'detail', data: detail });
           }
         });
