@@ -2620,36 +2620,36 @@ function loadAllProviderSettings() {
     }, 3000);
   }
   
-  // === 主程式執行 ===
-  
-  // 根據頁面類型自動執行對應的初始化
-  if (currentPage.type === 'shipping') {
-    // 物流單頁自動顯示面板
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        if (checkExtensionValid()) {
-          setTimeout(injectShippingPanel, 300);
-        }
-      });
-    } else {
+// === 主程式執行 ===
+
+// 根據頁面類型自動執行對應的初始化
+if (currentPage.type === 'shipping') {
+  // 物流單頁自動顯示面板
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
       if (checkExtensionValid()) {
         setTimeout(injectShippingPanel, 300);
       }
-    }
-  } else if (currentPage.type === 'detail') {
-    // 明細頁也自動啟動
-    console.log('BV SHOP 出貨明細頁面已偵測，自動啟動助手');
-    
-    // 自動啟動面板
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-          activateDetailPanel();
-        }, 500); // 給頁面一點時間載入完成
-      });
-    } else {
-      setTimeout(() => {
-        activateDetailPanel();
-      }, 500);
+    });
+  } else {
+    if (checkExtensionValid()) {
+      setTimeout(injectShippingPanel, 300);
     }
   }
+} else if (currentPage.type === 'detail') {
+  // 明細頁也自動啟動
+  console.log('BV SHOP 出貨明細頁面已偵測，自動啟動助手');
+  
+  // 自動啟動面板
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        activateDetailPanel();
+      }, 500); // 給頁面一點時間載入完成
+    });
+  } else {
+    setTimeout(() => {
+      activateDetailPanel();
+    }, 500);
+  }
+}
