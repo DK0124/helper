@@ -1370,23 +1370,6 @@
         });
         break;
         
-      case 'paired-reverse': // 物流單-出貨明細（反序）
-        const reversedDetails = [...detailData].reverse();
-        reversedDetails.forEach((detail, index) => {
-          if (detail.logTraceId && shippingMap.has(detail.logTraceId)) {
-            // 找到配對的物流單
-            const shipping = shippingMap.get(detail.logTraceId);
-            // 使用明細的訂單編號
-            pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
-            pageOrder.push({ type: 'detail', data: detail });
-          } else {
-            // 沒有配對，只印明細
-            console.warn(`明細 ${detail.orderNo} 找不到對應的物流單 (物流編號: ${detail.logTraceId})`);
-            pageOrder.push({ type: 'detail', data: detail });
-          }
-        });
-        break;
-        
       case 'shipping-only': // 純物流單（正序）
         shippingData.forEach(data => {
           pageOrder.push({ type: 'shipping', data: data });
