@@ -2653,5 +2653,4 @@ function loadAllProviderSettings() {
       }, 500);
     }
   }
-  
-})();
+  })();
