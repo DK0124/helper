@@ -1450,178 +1450,172 @@
       return;
     }
     
-    // 顯示載入中提示
-    showNotification('準備列印中...', 'info');
+    // 移除之前的列印樣式
+    const existingStyle = document.getElementById('bv-print-specific-styles');
+    if (existingStyle) {
+      existingStyle.remove();
+    }
     
-    // 創建新視窗
-    const printWindow = window.open('', 'BV_Print_Window', 'width=450,height=650');
-    
-    // 建立完整的 HTML
-    const printHTML = `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>列印 - BV SHOP 出貨助手</title>
-    <style>
-      /* 重置樣式 */
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      
-      /* 強制頁面設定 */
-      @page {
-        size: 100mm 150mm;
-        margin: 0;
-      }
-      
-      /* 列印樣式 */
+    // 添加列印專用樣式 - 強制覆蓋所有原始樣式
+    const printStyleElement = document.createElement('style');
+    printStyleElement.id = 'bv-print-specific-styles';
+    printStyleElement.textContent = `
+      /* 強制覆蓋原始的列印樣式 */
       @media print {
-        html, body {
-          width: 100mm;
-          height: auto;
-          margin: 0;
-          padding: 0;
+        /* 最高優先級的頁面設定 */
+        @page {
+          size: 100mm 150mm !important;
+          margin: 0 !important;
         }
         
-        .no-print {
+        /* 覆蓋所有 html 和 body 的設定 */
+        html {
+          width: auto !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          font-size: 16px !important;
+        }
+        
+        body {
+          width: auto !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: visible !important;
+          /* 移除原始的 20cm 寬度限制 */
+          max-width: none !important;
+          min-width: auto !important;
+        }
+        
+        /* 隱藏所有非列印內容 */
+        #bv-shipping-assistant-panel,
+        #bv-shipping-panel,
+        .bv-notification,
+        .ignore-print,
+        .order-content,
+        body > *:not(#bv-preview-container) {
           display: none !important;
+          visibility: hidden !important;
         }
         
-        .print-page {
+        /* 只顯示預覽容器 */
+        #bv-preview-container {
+          display: block !important;
+          visibility: visible !important;
+          width: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          position: static !important;
+        }
+        
+        /* 每頁固定 100mm x 150mm */
+        .bv-preview-page,
+        .bv-print-page {
+          display: block !important;
+          visibility: visible !important;
           width: 100mm !important;
           height: 150mm !important;
+          min-width: 100mm !important;
+          min-height: 150mm !important;
+          max-width: 100mm !important;
+          max-height: 150mm !important;
           margin: 0 !important;
           padding: 0 !important;
           page-break-after: always !important;
           page-break-inside: avoid !important;
+          position: relative !important;
+          box-sizing: border-box !important;
           overflow: hidden !important;
+          background: white !important;
+          border: none !important;
+          box-shadow: none !important;
         }
         
-        .print-page:last-child {
+        .bv-preview-page:last-child {
           page-break-after: auto !important;
         }
-      }
-      
-      /* 螢幕顯示樣式 */
-      @media screen {
-        body {
-          background: #e0e0e0;
-          padding: 20px;
-          font-family: Arial, sans-serif;
+        
+        /* 內容容器也固定尺寸 */
+        .bv-shipping-content,
+        .bv-detail-content {
+          display: block !important;
+          visibility: visible !important;
+          width: 100mm !important;
+          height: 150mm !important;
+          margin: 0 !important;
+          position: relative !important;
+          box-sizing: border-box !important;
         }
         
-        .print-controls {
-          text-align: center;
-          margin-bottom: 20px;
-          background: white;
-          padding: 15px;
-          border-radius: 8px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        /* 確保物流單正確顯示 */
+        .bv-shipping-wrapper,
+        .div_frame {
+          margin: 0 auto !important;
+          transform: none !important;
         }
         
-        .print-controls button {
-          background: #5865F2;
-          color: white;
-          border: none;
-          padding: 10px 30px;
-          border-radius: 5px;
-          font-size: 16px;
-          cursor: pointer;
-          margin: 0 5px;
+        /* 確保圖片和顏色正確顯示 */
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
         }
         
-        .print-controls button:hover {
-          background: #4752C4;
+        /* 確保所有內容可見 */
+        .bv-preview-page *,
+        .bv-print-page * {
+          visibility: visible !important;
         }
         
-        .print-page {
-          width: 100mm;
-          height: 150mm;
-          background: white;
-          margin: 0 auto 20px;
-          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-          position: relative;
-          overflow: hidden;
+        /* 隱藏底圖外的其他元素 */
+        .bv-watermark-logo {
+          opacity: var(--opacity) !important;
         }
       }
       
-      /* 內容樣式 */
-      .bv-shipping-content,
-      .bv-detail-content {
-        width: 100mm;
-        height: 150mm;
-        position: relative;
-        font-family: 'Noto Sans TC', 'Microsoft JhengHei', Arial, sans-serif;
+      /* 添加到普通樣式區，避免被覆蓋 */
+      @media all {
+        #bv-print-specific-styles {
+          display: none !important;
+        }
       }
-      
-      /* 物流單樣式 - 保持原始格式 */
-      .div_frame {
-        /* 7-11 物流單原始樣式 */
-      }
-      
-      /* 底圖樣式 */
-      .bv-watermark-logo {
-        position: absolute;
-        pointer-events: none;
-      }
-      
-      /* 表格樣式 */
-      table {
-        border-collapse: collapse;
-      }
-      
-      th, td {
-        padding: 4px;
-      }
-      
-      /* 確保列印顏色 */
-      * {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="print-controls no-print">
-      <h2>BV SHOP 出貨助手 - 列印預覽</h2>
-      <p>共 ${pages.length} 頁</p>
-      <button onclick="window.print()">列印</button>
-      <button onclick="window.close()">關閉</button>
-    </div>
-    
-    ${pages.map((page, index) => `
-      <div class="print-page">
-        ${page.innerHTML}
-      </div>
-    `).join('')}
-    
-    <script>
-      // 自動列印
-      window.onload = function() {
-        setTimeout(function() {
-          window.print();
-        }, 500);
-      };
-      
-      // 列印後自動關閉
-      window.onafterprint = function() {
-        setTimeout(function() {
-          window.close();
-        }, 1000);
-      };
-    </script>
-  </body>
-  </html>
     `;
     
-    // 寫入內容
-    printWindow.document.open();
-    printWindow.document.write(printHTML);
-    printWindow.document.close();
+    // 插入到 head 最後，確保優先級最高
+    document.head.appendChild(printStyleElement);
+    
+    // 暫時移除原始的 style 標籤
+    const originalStyles = document.querySelectorAll('style');
+    const styleStates = [];
+    originalStyles.forEach(style => {
+      if (style.id !== 'bv-print-specific-styles' && style.textContent.includes('@page')) {
+        styleStates.push({
+          element: style,
+          disabled: style.disabled
+        });
+        style.disabled = true;
+      }
+    });
+    
+    // 延遲執行列印
+    setTimeout(() => {
+      window.print();
+      
+      // 列印後恢復原始樣式
+      setTimeout(() => {
+        // 移除我們的列印樣式
+        const tempStyle = document.getElementById('bv-print-specific-styles');
+        if (tempStyle) {
+          tempStyle.remove();
+        }
+        
+        // 恢復原始樣式
+        styleStates.forEach(state => {
+          state.element.disabled = state.disabled;
+        });
+      }, 2000);
+    }, 100);
   }
   
   // 工具函數
