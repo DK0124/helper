@@ -1298,12 +1298,10 @@
         showNotification(`已儲存 ${provider === 'default' ? '通用' : provider} 的排版設定`, 'success');
       });
     }
-  }
-    
     // 初始化所有 range input 的進度條
     document.querySelectorAll('input[type="range"]').forEach(updateRangeProgress);
   }
-  
+        
   function setupLogoUpload(type) {
     const uploadArea = document.getElementById(`bv-${type}-logo-upload`);
     const input = document.getElementById(`bv-${type}-logo-input`);
