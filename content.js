@@ -1455,10 +1455,10 @@
     return pages;
   }
   
-  // 新增函數：標準化物流編號格式
-  function normalizeServiceCode(code) {
-    if (!code) return '';
-    
+    // 新增函數：標準化物流編號格式
+    function normalizeServiceCode(code) {
+      if (!code) return '';
+      
     // 移除空格和特殊字符
     let normalized = code.trim().toUpperCase();
     
