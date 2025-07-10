@@ -1355,12 +1355,12 @@ async function loadImageAsDataURL(url, imgElement) {
         break;
     }
     
-    // 產生頁面時，強制使用 100mm x 150mm
+  // 產生頁面
     pageOrder.forEach(item => {
       const page = document.createElement('div');
       page.className = 'bv-preview-page bv-print-page';
       
-      // 強制設定尺寸，不受設定影響
+      // 強制設定尺寸
       page.style.cssText = `
         width: 100mm !important;
         height: 150mm !important;
@@ -1381,6 +1381,23 @@ async function loadImageAsDataURL(url, imgElement) {
     });
     
     return pages;
+  }
+  
+  // 新增函數：標準化物流編號格式
+  function normalizeServiceCode(code) {
+    if (!code) return '';
+    
+    // 移除空格和特殊字符
+    let normalized = code.trim().toUpperCase();
+    
+    // 如果是完整的服務代碼（如 F05816537582），可能需要只取前面部分
+    // 7-11 的物流編號通常是 F + 8位數字
+    const match = normalized.match(/F\d{8}/);
+    if (match) {
+      return match[0];
+    }
+    
+    return normalized;
   }
   
   // 簡化的生成物流單頁面
