@@ -1455,23 +1455,6 @@
     return pages;
   }
   
-  // 新增函數：標準化物流編號格式
-  function normalizeServiceCode(code) {
-    if (!code) return '';
-    
-    // 移除空格和特殊字符
-    let normalized = code.trim().toUpperCase();
-    
-    // 如果是完整的服務代碼（如 F05816537582），可能需要只取前面部分
-    // 7-11 的物流編號通常是 F + 8位數字
-    const match = normalized.match(/F\d{8}/);
-    if (match) {
-      return match[0];
-    }
-    
-    return normalized;
-  }
-  
   // 簡化的生成物流單頁面
   function generateShippingPage(data, settings, customOrderNo) {
     if (!data) return '';
