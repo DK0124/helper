@@ -2637,21 +2637,21 @@ function loadAllProviderSettings() {
       }
     }
   } else if (currentPage.type === 'detail') {
-    // 明細頁等待使用者啟動
-    console.log('BV SHOP 出貨明細頁面已偵測，點擊擴充功能圖示以啟動');
+    // 明細頁也自動啟動
+    console.log('BV SHOP 出貨明細頁面已偵測，自動啟動助手');
     
-    // 自動抓取明細資料（使用者啟動面板後）
-    const observer = new MutationObserver((mutations) => {
-      if (panelActive && document.querySelector('.order-content')) {
-        fetchDetailData();
-        observer.disconnect();
-      }
-    });
-    
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    // 自動啟動面板
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          activateDetailPanel();
+        }, 500); // 給頁面一點時間載入完成
+      });
+    } else {
+      setTimeout(() => {
+        activateDetailPanel();
+      }, 500);
+    }
   }
   
 })();
