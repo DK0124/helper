@@ -915,7 +915,7 @@ img[src*="SendQRCode.ashx"] {
   }
 }
 
-/* 列印樣式 - 最小化改動 */
+/* 列印樣式 - 修正版 */
 @media print {
   /* 隱藏控制面板 */
   #bv-shipping-assistant-panel,
@@ -926,24 +926,32 @@ img[src*="SendQRCode.ashx"] {
     display: none !important;
   }
   
-  /* 設定頁面 */
+  /* 設定頁面尺寸為 10x15cm */
   @page {
     size: 100mm 150mm;
     margin: 0;
   }
   
-  /* 基本重置 */
+  /* 基本重置 - 不設定固定寬高 */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
   }
   
-  html, body {
+  /* 移除 html 和 body 的寬高限制 */
+  html {
     margin: 0 !important;
     padding: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+  }
+  
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    height: auto !important;
     background: white !important;
   }
   
@@ -952,11 +960,12 @@ img[src*="SendQRCode.ashx"] {
     display: block !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 100% !important;
+    width: auto !important;
   }
   
-  /* 每個列印頁面 */
-  .bv-preview-page {
+  /* 每個列印頁面 - 固定為 10x15cm */
+  .bv-preview-page,
+  .bv-print-page {
     width: 100mm !important;
     height: 150mm !important;
     margin: 0 !important;
@@ -967,13 +976,15 @@ img[src*="SendQRCode.ashx"] {
     overflow: hidden !important;
     background: white !important;
     box-shadow: none !important;
+    border: none !important;
+    box-sizing: border-box !important;
   }
   
   .bv-preview-page:last-child {
     page-break-after: auto !important;
   }
   
-  /* 物流單內容容器 */
+  /* 物流單內容容器 - 固定為 10x15cm */
   .bv-shipping-content {
     width: 100mm !important;
     height: 150mm !important;
@@ -983,14 +994,16 @@ img[src*="SendQRCode.ashx"] {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    box-sizing: border-box !important;
   }
   
   /* 保持原始物流單格式 */
   .bv-shipping-wrapper {
     margin: 0 auto !important;
+    transform: none !important;
   }
   
-  /* 明細內容容器 */
+  /* 明細內容容器 - 固定為 10x15cm */
   .bv-detail-content {
     width: 100mm !important;
     height: 150mm !important;
@@ -1034,8 +1047,13 @@ img[src*="SendQRCode.ashx"] {
   p, span, div {
     visibility: visible !important;
   }
+  
+  /* 物流單原始框架 */
+  .div_frame {
+    transform: none !important;
+    margin: 0 auto !important;
+  }
 }
-
 /* 響應式設計 */
 @media (max-width: 768px) {
   #bv-shipping-assistant-panel {
