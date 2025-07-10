@@ -1233,10 +1233,11 @@
     
     const displayOrderNo = customOrderNo || data.orderNo;
     
+    // 始終使用 100mm x 150mm
     return `
       <div class="bv-shipping-content" style="
-        width: ${settings.paper.width}mm;
-        height: ${settings.paper.height}mm;
+        width: 100mm;
+        height: 150mm;
         position: relative;
         overflow: hidden;
         background: white;
@@ -1245,6 +1246,7 @@
         justify-content: center;
         margin: 0;
         padding: 0;
+        box-sizing: border-box;
       ">
         <!-- 底圖（最底層） -->
         ${settings.shipping.logo ? `
@@ -1260,8 +1262,6 @@
                  --opacity: ${settings.shipping.logoOpacity / 100};
                  pointer-events: none;
                  z-index: 1;
-                 -webkit-print-color-adjust: exact;
-                 print-color-adjust: exact;
                ">
         ` : ''}
         
@@ -1286,9 +1286,6 @@
             z-index: 1000;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             white-space: nowrap;
-            font-family: Arial, sans-serif;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
           ">
             訂單編號：${displayOrderNo}
           </div>
@@ -1304,17 +1301,18 @@
     const info = data.orderInfo;
     const scale = settings.paper.scale / 100;
     
-    // 計算實際可用空間
-    const availableWidth = (settings.paper.width - (settings.paper.margin * 2)) / scale;
+    // 始終使用 100mm x 150mm，但內部邊距仍可調整
+    const actualMargin = Math.min(settings.paper.margin, 10); // 限制最大邊距為 10mm
+    const availableWidth = (100 - (actualMargin * 2)) / scale;
     
     return `
       <div class="bv-detail-content" style="
-        width: ${settings.paper.width}mm;
-        height: ${settings.paper.height}mm;
+        width: 100mm;
+        height: 150mm;
         position: relative;
         overflow: hidden;
         background: white;
-        padding: ${settings.paper.margin}mm;
+        padding: ${actualMargin}mm;
         box-sizing: border-box;
       ">
         <!-- 底圖 -->
@@ -1331,12 +1329,10 @@
                  --opacity: ${settings.detail.logoOpacity / 100};
                  pointer-events: none;
                  z-index: 1;
-                 -webkit-print-color-adjust: exact;
-                 print-color-adjust: exact;
                ">
         ` : ''}
         
-        <!-- 明細內容 -->
+        <!-- 明細內容（其餘保持不變） -->
         <div style="
           transform: scale(${scale});
           transform-origin: top left;
@@ -1438,7 +1434,6 @@
     return phone.substring(0, 4) + '***' + phone.substring(phone.length - 3);
   }
   
-  // 使用 Chrome 列印 API 的處理方式
   function handlePrint() {
     const settings = getSettings();
     const printOrder = document.getElementById('bv-print-order').value;
@@ -1449,30 +1444,36 @@
       return;
     }
     
-    // 添加列印專用樣式
-    let printStyleElement = document.getElementById('bv-print-specific-styles');
-    if (!printStyleElement) {
-      printStyleElement = document.createElement('style');
-      printStyleElement.id = 'bv-print-specific-styles';
-      document.head.appendChild(printStyleElement);
+    // 移除之前的列印樣式（如果存在）
+    const existingStyle = document.getElementById('bv-print-specific-styles');
+    if (existingStyle) {
+      existingStyle.remove();
     }
     
+    // 添加列印專用樣式
+    const printStyleElement = document.createElement('style');
+    printStyleElement.id = 'bv-print-specific-styles';
     printStyleElement.textContent = `
       @media print {
-        /* 重置所有邊距 */
-        * {
+        /* 強制頁面設定 */
+        @page {
+          size: 100mm 150mm !important;
+          margin: 0 !important;
+        }
+        
+        /* 移除所有寬高限制 */
+        html {
+          width: auto !important;
+          height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
         }
         
-        @page {
-          size: 100mm 150mm;
-          margin: 0;
-        }
-        
-        html, body {
-          width: 100mm !important;
-          height: 100% !important;
+        body {
+          width: auto !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
           overflow: visible !important;
         }
         
@@ -1487,11 +1488,12 @@
         
         #bv-preview-container {
           display: block !important;
-          width: 100mm !important;
+          width: auto !important;
           margin: 0 !important;
           padding: 0 !important;
         }
         
+        /* 每頁固定 10x15cm */
         .bv-preview-page {
           width: 100mm !important;
           height: 150mm !important;
@@ -1499,10 +1501,20 @@
           padding: 0 !important;
           page-break-after: always !important;
           position: relative !important;
+          box-sizing: border-box !important;
         }
         
         .bv-preview-page:last-child {
           page-break-after: auto !important;
+        }
+        
+        /* 內容容器也固定 10x15cm */
+        .bv-shipping-content,
+        .bv-detail-content {
+          width: 100mm !important;
+          height: 150mm !important;
+          margin: 0 !important;
+          box-sizing: border-box !important;
         }
         
         /* 保持物流單原始樣式 */
@@ -1510,17 +1522,26 @@
           margin: 0 auto !important;
         }
         
-        /* 確保圖片顯示 */
-        img {
+        /* 確保圖片和顏色正確顯示 */
+        * {
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
       }
     `;
+    document.head.appendChild(printStyleElement);
     
     // 延遲執行列印，確保樣式已套用
     setTimeout(() => {
       window.print();
+      
+      // 列印後清理（給予足夠時間）
+      setTimeout(() => {
+        const tempStyle = document.getElementById('bv-print-specific-styles');
+        if (tempStyle) {
+          tempStyle.remove();
+        }
+      }, 2000);
     }, 100);
   }
   
