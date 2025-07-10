@@ -1018,10 +1018,10 @@
     
     // 初始化預設系統
     initPresetSystem();
-  }
-
+  
     // 載入所有超商設定
-    loadAllProviderSettings();
+    loadAllProviderSettings();  
+}
   
   function fetchDetailData() {
     console.log('開始抓取明細');
