@@ -1205,17 +1205,23 @@
         break;
     }
     
-    // 產生頁面
+    // 產生頁面時，強制使用 100mm x 150mm
     pageOrder.forEach(item => {
       const page = document.createElement('div');
       page.className = 'bv-preview-page bv-print-page';
       
-      // 使用統一的紙張尺寸
-      page.style.width = settings.paper.width + 'mm';
-      page.style.height = settings.paper.height + 'mm';
+      // 強制設定尺寸，不受設定影響
+      page.style.cssText = `
+        width: 100mm !important;
+        height: 150mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        position: relative !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+      `;
       
       if (item.type === 'shipping') {
-        // 傳遞自訂的訂單編號（如果有的話）
         page.innerHTML = generateShippingPage(item.data, settings, item.orderNo);
       } else {
         page.innerHTML = generateDetailPage(item.data, settings);
