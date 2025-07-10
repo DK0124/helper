@@ -1245,34 +1245,18 @@
     const pages = [];
     let pageOrder = [];
     
-    // 建立物流單的映射
+    // 建立物流單的映射 - 簡化版
     const shippingMap = new Map();
     
     console.log('=== 開始建立物流單映射 ===');
     console.log('物流單資料:', shippingData);
     
+    // 只用服務代碼作為 key
     shippingData.forEach((data, index) => {
       if (data.serviceCode) {
         const code = data.serviceCode.trim();
-        
-        // 儲存原始編號
         shippingMap.set(code, data);
         console.log(`物流單 ${index + 1}: 服務代碼 = ${code}`);
-        
-        // 也儲存只有前11位的版本（如果是12位）
-        if (code.length === 12) {
-          const code11 = code.substring(0, 11);
-          shippingMap.set(code11, data);
-          console.log(`  - 也儲存11位版本: ${code11}`);
-        }
-        
-        // 儲存前8位數字版本 (F + 8位)
-        const match = code.match(/F(\d{8})/);
-        if (match) {
-          const shortCode = 'F' + match[1];
-          shippingMap.set(shortCode, data);
-          console.log(`  - 也儲存短版本: ${shortCode}`);
-        }
       }
     });
     
@@ -1289,39 +1273,10 @@
             const detailCode = detail.logTraceId.trim();
             console.log(`  物流編號: ${detailCode}`);
             
-            let shipping = null;
-            
-            // 1. 直接匹配
+            // 直接匹配
             if (shippingMap.has(detailCode)) {
-              shipping = shippingMap.get(detailCode);
-              console.log(`  ✓ 直接匹配成功`);
-            }
-            
-            // 2. 如果明細是11位，物流單可能是12位
-            if (!shipping) {
-              for (const [code, data] of shippingMap) {
-                if (code.startsWith(detailCode) || detailCode.startsWith(code)) {
-                  shipping = data;
-                  console.log(`  ✓ 前綴匹配成功: ${code}`);
-                  break;
-                }
-              }
-            }
-            
-            // 3. 提取前8位再試
-            if (!shipping) {
-              const match = detailCode.match(/F(\d{8})/);
-              if (match) {
-                const shortCode = 'F' + match[1];
-                if (shippingMap.has(shortCode)) {
-                  shipping = shippingMap.get(shortCode);
-                  console.log(`  ✓ 短編號匹配成功: ${shortCode}`);
-                }
-              }
-            }
-            
-            if (shipping) {
-              console.log(`  ✓ 最終配對成功！`);
+              const shipping = shippingMap.get(detailCode);
+              console.log(`  ✓ 配對成功`);
               pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
               pageOrder.push({ type: 'detail', data: detail });
             } else {
@@ -1345,27 +1300,18 @@
             const detailCode = detail.logTraceId.trim();
             console.log(`  物流編號: ${detailCode}`);
             
-            let shipping = null;
-            
-            // 使用相同的配對邏輯
+            // 直接匹配
             if (shippingMap.has(detailCode)) {
-              shipping = shippingMap.get(detailCode);
-            } else {
-              for (const [code, data] of shippingMap) {
-                if (code.startsWith(detailCode) || detailCode.startsWith(code)) {
-                  shipping = data;
-                  break;
-                }
-              }
-            }
-            
-            if (shipping) {
+              const shipping = shippingMap.get(detailCode);
+              console.log(`  ✓ 配對成功`);
               pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
               pageOrder.push({ type: 'detail', data: detail });
             } else {
+              console.warn(`  ✗ 找不到對應的物流單`);
               pageOrder.push({ type: 'detail', data: detail });
             }
           } else {
+            console.log(`  - 沒有物流編號`);
             pageOrder.push({ type: 'detail', data: detail });
           }
         });
@@ -1426,90 +1372,6 @@
     });
     
     return pages;
-  }
-  
-  // 新增函數：標準化物流編號格式
-  function normalizeServiceCode(code) {
-    if (!code) return '';
-    
-    // 移除空格和特殊字符
-    let normalized = code.trim().toUpperCase();
-    
-    // 如果是完整的服務代碼（如 F05816537582），可能需要只取前面部分
-    // 7-11 的物流編號通常是 F + 8位數字
-    const match = normalized.match(/F\d{8}/);
-    if (match) {
-      return match[0];
-    }
-    
-    return normalized;
-  }
-  
-  // 簡化的生成物流單頁面
-  function generateShippingPage(data, settings, customOrderNo) {
-    if (!data) return '';
-    
-    const displayOrderNo = customOrderNo || data.orderNo;
-    
-    // 始終使用 100mm x 150mm
-    return `
-      <div class="bv-shipping-content" style="
-        width: 100mm;
-        height: 150mm;
-        position: relative;
-        overflow: hidden;
-        background: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      ">
-        <!-- 底圖（最底層） -->
-        ${settings.shipping.logo ? `
-          <img src="${settings.shipping.logo}" 
-               class="bv-watermark-logo"
-               style="
-                 position: absolute;
-                 top: ${settings.shipping.logoY}%;
-                 left: ${settings.shipping.logoX}%;
-                 transform: translate(-50%, -50%);
-                 width: ${settings.shipping.logoSize}mm;
-                 opacity: ${settings.shipping.logoOpacity / 100};
-                 --opacity: ${settings.shipping.logoOpacity / 100};
-                 pointer-events: none;
-                 z-index: 1;
-               ">
-        ` : ''}
-        
-        <!-- 物流單內容 -->
-        <div style="z-index: 2; position: relative;">
-          ${data.html}
-        </div>
-        
-        <!-- 訂單編號標籤（最上層） -->
-        ${settings.showOrderNumber && displayOrderNo ? `
-          <div style="
-            position: absolute;
-            top: ${settings.orderLabelTop}mm;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 4px 12px;
-            border: 1px solid #333;
-            border-radius: 4px;
-            font-size: ${settings.orderLabelSize}px;
-            font-weight: bold;
-            z-index: 1000;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            white-space: nowrap;
-          ">
-            訂單編號：${displayOrderNo}
-          </div>
-        ` : ''}
-      </div>
-    `;
   }
   
   function generateDetailPage(data, settings) {
