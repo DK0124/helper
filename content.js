@@ -1444,29 +1444,31 @@
       return;
     }
     
-    // 移除之前的列印樣式（如果存在）
+    // 移除之前的列印樣式
     const existingStyle = document.getElementById('bv-print-specific-styles');
     if (existingStyle) {
       existingStyle.remove();
     }
     
-    // 添加列印專用樣式
+    // 添加列印專用樣式 - 強制覆蓋所有原始樣式
     const printStyleElement = document.createElement('style');
     printStyleElement.id = 'bv-print-specific-styles';
     printStyleElement.textContent = `
+      /* 強制覆蓋原始的列印樣式 */
       @media print {
-        /* 強制頁面設定 */
+        /* 最高優先級的頁面設定 */
         @page {
           size: 100mm 150mm !important;
           margin: 0 !important;
         }
         
-        /* 移除所有寬高限制 */
+        /* 覆蓋所有 html 和 body 的設定 */
         html {
           width: auto !important;
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
+          font-size: 16px !important;
         }
         
         body {
@@ -1475,72 +1477,137 @@
           margin: 0 !important;
           padding: 0 !important;
           overflow: visible !important;
+          /* 移除原始的 20cm 寬度限制 */
+          max-width: none !important;
+          min-width: auto !important;
         }
         
-        /* 隱藏非列印元素 */
+        /* 隱藏所有非列印內容 */
         #bv-shipping-assistant-panel,
         #bv-shipping-panel,
         .bv-notification,
         .ignore-print,
+        .order-content,
         body > *:not(#bv-preview-container) {
           display: none !important;
+          visibility: hidden !important;
         }
         
+        /* 只顯示預覽容器 */
         #bv-preview-container {
           display: block !important;
+          visibility: visible !important;
           width: auto !important;
           margin: 0 !important;
           padding: 0 !important;
+          position: static !important;
         }
         
-        /* 每頁固定 10x15cm */
-        .bv-preview-page {
+        /* 每頁固定 100mm x 150mm */
+        .bv-preview-page,
+        .bv-print-page {
+          display: block !important;
+          visibility: visible !important;
           width: 100mm !important;
           height: 150mm !important;
+          min-width: 100mm !important;
+          min-height: 150mm !important;
+          max-width: 100mm !important;
+          max-height: 150mm !important;
           margin: 0 !important;
           padding: 0 !important;
           page-break-after: always !important;
+          page-break-inside: avoid !important;
           position: relative !important;
           box-sizing: border-box !important;
+          overflow: hidden !important;
+          background: white !important;
+          border: none !important;
+          box-shadow: none !important;
         }
         
         .bv-preview-page:last-child {
           page-break-after: auto !important;
         }
         
-        /* 內容容器也固定 10x15cm */
+        /* 內容容器也固定尺寸 */
         .bv-shipping-content,
         .bv-detail-content {
+          display: block !important;
+          visibility: visible !important;
           width: 100mm !important;
           height: 150mm !important;
           margin: 0 !important;
+          position: relative !important;
           box-sizing: border-box !important;
         }
         
-        /* 保持物流單原始樣式 */
-        .bv-shipping-wrapper {
+        /* 確保物流單正確顯示 */
+        .bv-shipping-wrapper,
+        .div_frame {
           margin: 0 auto !important;
+          transform: none !important;
         }
         
         /* 確保圖片和顏色正確顯示 */
         * {
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+        
+        /* 確保所有內容可見 */
+        .bv-preview-page *,
+        .bv-print-page * {
+          visibility: visible !important;
+        }
+        
+        /* 隱藏底圖外的其他元素 */
+        .bv-watermark-logo {
+          opacity: var(--opacity) !important;
+        }
+      }
+      
+      /* 添加到普通樣式區，避免被覆蓋 */
+      @media all {
+        #bv-print-specific-styles {
+          display: none !important;
         }
       }
     `;
+    
+    // 插入到 head 最後，確保優先級最高
     document.head.appendChild(printStyleElement);
     
-    // 延遲執行列印，確保樣式已套用
+    // 暫時移除原始的 style 標籤
+    const originalStyles = document.querySelectorAll('style');
+    const styleStates = [];
+    originalStyles.forEach(style => {
+      if (style.id !== 'bv-print-specific-styles' && style.textContent.includes('@page')) {
+        styleStates.push({
+          element: style,
+          disabled: style.disabled
+        });
+        style.disabled = true;
+      }
+    });
+    
+    // 延遲執行列印
     setTimeout(() => {
       window.print();
       
-      // 列印後清理（給予足夠時間）
+      // 列印後恢復原始樣式
       setTimeout(() => {
+        // 移除我們的列印樣式
         const tempStyle = document.getElementById('bv-print-specific-styles');
         if (tempStyle) {
           tempStyle.remove();
         }
+        
+        // 恢復原始樣式
+        styleStates.forEach(state => {
+          state.element.disabled = state.disabled;
+        });
       }, 2000);
     }, 100);
   }
