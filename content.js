@@ -269,10 +269,18 @@
             }
           });
           
-          // 提取資訊
+          // 提取資訊 - 修正這部分
           let orderNo = '';
           let serviceCode = '';
-    // 方法 1: 從特定元素取得
+          const text = wrapper.textContent || '';
+          
+          // 提取訂單編號
+          const orderMatch = text.match(/(?:寄件)?訂單編號[：:]\s*(\w+)/);
+          if (orderMatch) {
+            orderNo = orderMatch[1];
+          }
+          
+          // 方法 1: 從特定元素取得
           const serviceCodeElement = wrapper.querySelector('span[id*="lblC2BPinCode"]');
           if (serviceCodeElement) {
             serviceCode = serviceCodeElement.textContent.trim();
@@ -281,8 +289,6 @@
           
           // 方法 2: 從文字中尋找
           if (!serviceCode) {
-            const text = wrapper.textContent || '';
-            
             // 尋找 "交貨便服務代碼：" 後面的編號
             const serviceMatch = text.match(/交貨便服務代碼[：:]\s*([A-Z]\d{11,12})/);
             if (serviceMatch) {
@@ -315,6 +321,7 @@
           console.error(`處理物流單 ${index + 1} 時發生錯誤:`, error);
         }
       });
+    }
     
     saveShippingData();
   }
@@ -1237,56 +1244,127 @@
     const pages = [];
     let pageOrder = [];
     
-    // 根據物流編號建立配對關係
-    const pairMap = new Map();
-    
-    // 建立物流單的映射 - 注意這裡要處理編號格式
+    // 建立物流單的映射
     const shippingMap = new Map();
-    shippingData.forEach(data => {
+    
+    console.log('=== 開始建立物流單映射 ===');
+    console.log('物流單資料:', shippingData);
+    
+    shippingData.forEach((data, index) => {
       if (data.serviceCode) {
-        // 標準化物流編號格式
-        const normalizedCode = normalizeServiceCode(data.serviceCode);
-        shippingMap.set(normalizedCode, data);
-        console.log(`物流單編號: ${data.serviceCode} -> 標準化: ${normalizedCode}`);
+        const code = data.serviceCode.trim();
+        
+        // 儲存原始編號
+        shippingMap.set(code, data);
+        console.log(`物流單 ${index + 1}: 服務代碼 = ${code}`);
+        
+        // 也儲存只有前11位的版本（如果是12位）
+        if (code.length === 12) {
+          const code11 = code.substring(0, 11);
+          shippingMap.set(code11, data);
+          console.log(`  - 也儲存11位版本: ${code11}`);
+        }
+        
+        // 儲存前8位數字版本 (F + 8位)
+        const match = code.match(/F(\d{8})/);
+        if (match) {
+          const shortCode = 'F' + match[1];
+          shippingMap.set(shortCode, data);
+          console.log(`  - 也儲存短版本: ${shortCode}`);
+        }
       }
     });
+    
+    console.log('=== 開始配對明細 ===');
+    console.log('明細資料:', detailData);
     
     // 根據列印順序產生頁面順序
     switch (printOrder) {
       case 'paired-sequential': // 物流單-出貨明細（正序）
         detailData.forEach((detail, index) => {
+          console.log(`\n處理明細 ${index + 1}: 訂單 = ${detail.orderNo}`);
+          
           if (detail.logTraceId) {
-            // 標準化明細的物流編號
-            const normalizedDetailCode = normalizeServiceCode(detail.logTraceId);
-            console.log(`明細物流編號: ${detail.logTraceId} -> 標準化: ${normalizedDetailCode}`);
+            const detailCode = detail.logTraceId.trim();
+            console.log(`  物流編號: ${detailCode}`);
             
-            if (shippingMap.has(normalizedDetailCode)) {
-              // 找到配對的物流單
-              const shipping = shippingMap.get(normalizedDetailCode);
-              console.log(`成功配對: 明細 ${detail.orderNo} <-> 物流單`);
-              pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
-              pageOrder.push({ type: 'detail', data: detail });
-            } else {
-              // 嘗試其他匹配方式
-              let matched = false;
-              for (const [code, shipping] of shippingMap) {
-                if (code.includes(normalizedDetailCode) || normalizedDetailCode.includes(code)) {
-                  console.log(`模糊配對成功: 明細 ${detail.orderNo} <-> 物流單`);
-                  pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
-                  pageOrder.push({ type: 'detail', data: detail });
-                  matched = true;
+            let shipping = null;
+            
+            // 1. 直接匹配
+            if (shippingMap.has(detailCode)) {
+              shipping = shippingMap.get(detailCode);
+              console.log(`  ✓ 直接匹配成功`);
+            }
+            
+            // 2. 如果明細是11位，物流單可能是12位
+            if (!shipping) {
+              for (const [code, data] of shippingMap) {
+                if (code.startsWith(detailCode) || detailCode.startsWith(code)) {
+                  shipping = data;
+                  console.log(`  ✓ 前綴匹配成功: ${code}`);
                   break;
                 }
               }
-              
-              if (!matched) {
-                console.warn(`明細 ${detail.orderNo} 找不到對應的物流單 (物流編號: ${detail.logTraceId})`);
-                pageOrder.push({ type: 'detail', data: detail });
+            }
+            
+            // 3. 提取前8位再試
+            if (!shipping) {
+              const match = detailCode.match(/F(\d{8})/);
+              if (match) {
+                const shortCode = 'F' + match[1];
+                if (shippingMap.has(shortCode)) {
+                  shipping = shippingMap.get(shortCode);
+                  console.log(`  ✓ 短編號匹配成功: ${shortCode}`);
+                }
               }
             }
+            
+            if (shipping) {
+              console.log(`  ✓ 最終配對成功！`);
+              pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
+              pageOrder.push({ type: 'detail', data: detail });
+            } else {
+              console.warn(`  ✗ 找不到對應的物流單`);
+              console.log(`  已有的物流單編號:`, Array.from(shippingMap.keys()));
+              pageOrder.push({ type: 'detail', data: detail });
+            }
           } else {
-            // 沒有物流編號，只印明細
-            console.log(`明細 ${detail.orderNo} 沒有物流編號`);
+            console.log(`  - 沒有物流編號`);
+            pageOrder.push({ type: 'detail', data: detail });
+          }
+        });
+        break;
+        
+      case 'paired-reverse': // 物流單-出貨明細（反序）
+        const reversedDetails = [...detailData].reverse();
+        reversedDetails.forEach((detail, index) => {
+          console.log(`\n處理明細 ${index + 1}: 訂單 = ${detail.orderNo}`);
+          
+          if (detail.logTraceId) {
+            const detailCode = detail.logTraceId.trim();
+            console.log(`  物流編號: ${detailCode}`);
+            
+            let shipping = null;
+            
+            // 使用相同的配對邏輯
+            if (shippingMap.has(detailCode)) {
+              shipping = shippingMap.get(detailCode);
+            } else {
+              for (const [code, data] of shippingMap) {
+                if (code.startsWith(detailCode) || detailCode.startsWith(code)) {
+                  shipping = data;
+                  break;
+                }
+              }
+            }
+            
+            if (shipping) {
+              pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
+              pageOrder.push({ type: 'detail', data: detail });
+            } else {
+              pageOrder.push({ type: 'detail', data: detail });
+            }
+          } else {
             pageOrder.push({ type: 'detail', data: detail });
           }
         });
@@ -1340,6 +1418,38 @@
       page.className = 'bv-preview-page bv-print-page';
       
       // 強制設定尺寸
+      page.style.cssText = `
+        width: 100mm !important;
+        height: 150mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        position: relative !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+      `;
+      
+      if (item.type === 'shipping') {
+        page.innerHTML = generateShippingPage(item.data, settings, item.orderNo);
+      } else {
+        page.innerHTML = generateDetailPage(item.data, settings);
+      }
+      
+      pages.push(page);
+    });
+    
+    return pages;
+  }
+    
+    console.log(`\n=== 配對結果 ===`);
+    console.log(`總共 ${pageOrder.length} 頁`);
+    console.log(`物流單: ${pageOrder.filter(p => p.type === 'shipping').length} 張`);
+    console.log(`明細: ${pageOrder.filter(p => p.type === 'detail').length} 張`);
+    
+    // 產生頁面
+    pageOrder.forEach(item => {
+      const page = document.createElement('div');
+      page.className = 'bv-preview-page bv-print-page';
+      
       page.style.cssText = `
         width: 100mm !important;
         height: 150mm !important;
