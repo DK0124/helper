@@ -299,10 +299,11 @@
           
           // 方法 3: 尋找任何 F 開頭的編號
           if (!serviceCode) {
-            const codeMatch = text.match(/F\d{11,12}/);
+            // 支援 8 碼或 12 碼格式
+            const codeMatch = text.match(/[FE]\d{7}(?:\d{4})?/);
             if (codeMatch) {
               serviceCode = codeMatch[0];
-              console.log(`  從 F 編號匹配取得: ${serviceCode}`);
+              console.log(`  從編號匹配取得: ${serviceCode} (${serviceCode.length}碼)`);
             }
           }
           
@@ -997,11 +998,13 @@
       // 提取訂單資訊
       const orderInfo = extractDetailOrderInfo(clone);
       
-      // 提取物流編號
+      // 提取物流編號 - 支援 8 碼或 12 碼
       let logTraceId = '';
       const logTraceElement = clone.querySelector('.showLogTraceID');
       if (logTraceElement) {
-        const match = logTraceElement.textContent.match(/物流編號[:\s]*([A-Z]\d{11})/);
+        const text = logTraceElement.textContent;
+        // 修改正則：F 開頭，後面跟 7 位數字（總共 8 碼）或 11 位數字（總共 12 碼）
+        const match = text.match(/物流編號[:\s]*([FE]\d{7}(?:\d{4})?)/);
         if (match) {
           logTraceId = match[1];
         }
@@ -1032,7 +1035,7 @@
       });
     }
   }
-  
+    
   function extractDetailOrderInfo(element) {
     const info = {
       orderNo: '',
@@ -1245,18 +1248,24 @@
     const pages = [];
     let pageOrder = [];
     
-    // 建立物流單的映射 - 簡化版
+    // 建立物流單的映射
     const shippingMap = new Map();
     
     console.log('=== 開始建立物流單映射 ===');
     console.log('物流單資料:', shippingData);
     
-    // 只用服務代碼作為 key
     shippingData.forEach((data, index) => {
       if (data.serviceCode) {
         const code = data.serviceCode.trim();
         shippingMap.set(code, data);
-        console.log(`物流單 ${index + 1}: 服務代碼 = ${code}`);
+        console.log(`物流單 ${index + 1}: 服務代碼 = ${code} (${code.length}碼)`);
+        
+        // 如果是 12 碼，也儲存前 8 碼版本
+        if (code.length === 12) {
+          const shortCode = code.substring(0, 8);
+          shippingMap.set(shortCode, data);
+          console.log(`  - 也儲存 8 碼版本: ${shortCode}`);
+        }
       }
     });
     
@@ -1271,12 +1280,35 @@
           
           if (detail.logTraceId) {
             const detailCode = detail.logTraceId.trim();
-            console.log(`  物流編號: ${detailCode}`);
+            console.log(`  物流編號: ${detailCode} (${detailCode.length}碼)`);
             
-            // 直接匹配
+            let shipping = null;
+            
+            // 1. 直接匹配
             if (shippingMap.has(detailCode)) {
-              const shipping = shippingMap.get(detailCode);
-              console.log(`  ✓ 配對成功`);
+              shipping = shippingMap.get(detailCode);
+              console.log(`  ✓ 直接配對成功`);
+            } 
+            // 2. 如果明細是 8 碼，嘗試找對應的 12 碼物流單
+            else if (detailCode.length === 8) {
+              for (const [code, data] of shippingMap) {
+                if (code.startsWith(detailCode)) {
+                  shipping = data;
+                  console.log(`  ✓ 配對成功: 明細 8 碼 ${detailCode} 匹配物流單 ${code}`);
+                  break;
+                }
+              }
+            }
+            // 3. 如果明細是 12 碼，嘗試用前 8 碼匹配
+            else if (detailCode.length === 12) {
+              const shortCode = detailCode.substring(0, 8);
+              if (shippingMap.has(shortCode)) {
+                shipping = shippingMap.get(shortCode);
+                console.log(`  ✓ 配對成功: 明細前 8 碼 ${shortCode} 匹配物流單`);
+              }
+            }
+            
+            if (shipping) {
               pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
               pageOrder.push({ type: 'detail', data: detail });
             } else {
@@ -1298,20 +1330,34 @@
           
           if (detail.logTraceId) {
             const detailCode = detail.logTraceId.trim();
-            console.log(`  物流編號: ${detailCode}`);
+            console.log(`  物流編號: ${detailCode} (${detailCode.length}碼)`);
             
-            // 直接匹配
+            let shipping = null;
+            
+            // 使用相同的配對邏輯
             if (shippingMap.has(detailCode)) {
-              const shipping = shippingMap.get(detailCode);
-              console.log(`  ✓ 配對成功`);
+              shipping = shippingMap.get(detailCode);
+            } else if (detailCode.length === 8) {
+              for (const [code, data] of shippingMap) {
+                if (code.startsWith(detailCode)) {
+                  shipping = data;
+                  break;
+                }
+              }
+            } else if (detailCode.length === 12) {
+              const shortCode = detailCode.substring(0, 8);
+              if (shippingMap.has(shortCode)) {
+                shipping = shippingMap.get(shortCode);
+              }
+            }
+            
+            if (shipping) {
               pageOrder.push({ type: 'shipping', data: shipping, orderNo: detail.orderNo });
               pageOrder.push({ type: 'detail', data: detail });
             } else {
-              console.warn(`  ✗ 找不到對應的物流單`);
               pageOrder.push({ type: 'detail', data: detail });
             }
           } else {
-            console.log(`  - 沒有物流編號`);
             pageOrder.push({ type: 'detail', data: detail });
           }
         });
