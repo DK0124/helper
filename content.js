@@ -74,9 +74,11 @@
         hostname.includes('eship.7-11.com.tw')) {
       return { type: 'shipping', provider: 'seven' };
     } 
-    // 全家物流單
-    else if (hostname.includes('family.com.tw') || 
-             hostname.includes('famiport.com.tw')) {
+    // 全家物流單 - 更新這部分
+    else if (hostname.includes('logistics.ecpay.com.tw') || // 綠界
+             hostname.includes('logistic.paynow.com.tw') ||  // PayNow
+             hostname.includes('famiport.com.tw') ||
+             hostname.includes('family.com.tw')) {
       return { type: 'shipping', provider: 'family' };
     } 
     // 萊爾富物流單
@@ -89,7 +91,6 @@
     }
     // BV SHOP 後台
     else if (hostname.includes('bvshop-manage.bvshop.tw')) {
-      // 只針對列印頁面
       if (pathname === '/order_print' || pathname.includes('order_print')) {
         console.log('偵測到 BV SHOP 列印頁面');
         return { type: 'detail', provider: 'bvshop' };
