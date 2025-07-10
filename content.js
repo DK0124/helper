@@ -327,6 +327,119 @@
         }
       });
     }
+
+    // 新增：全家超商抓取邏輯
+    else if (currentPage.provider === 'family') {
+      console.log('開始抓取全家物流單');
+      
+      // 綠界和 PayNow 都是用圖片顯示物流單
+      const images = document.querySelectorAll('#printDiv img, form img[src*="width="], img[src*="FamiPort"]');
+      
+      console.log('找到的物流單圖片數量:', images.length);
+      
+      images.forEach((img, index) => {
+        try {
+          // 確保圖片是物流單（通常寬度為 627px 或包含特定關鍵字）
+          const imgSrc = img.src || img.getAttribute('src');
+          const imgStyle = window.getComputedStyle(img);
+          
+          // 檢查是否為物流單圖片
+          if (!imgSrc || 
+              (!imgSrc.includes('width=627') && 
+               !imgSrc.includes('FamiPort') && 
+               imgStyle.width !== '627px')) {
+            return;
+          }
+          
+          // 創建包裝容器
+          const wrapper = document.createElement('div');
+          wrapper.className = 'bv-shipping-wrapper';
+          wrapper.style.cssText = `
+            width: 627px;
+            margin: 0 auto;
+            padding: 0;
+            background: white;
+            position: relative;
+          `;
+          
+          // 複製圖片
+          const newImg = document.createElement('img');
+          newImg.src = imgSrc;
+          newImg.style.cssText = `
+            width: 627px;
+            display: block;
+            margin: 0 auto;
+          `;
+          
+          wrapper.appendChild(newImg);
+          
+          // 嘗試從圖片 URL 或頁面提取資訊
+          let orderNo = '';
+          let serviceCode = '';
+          
+          // 方法 1: 從 URL 參數提取
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.has('LogisticsSubType')) {
+            serviceCode = urlParams.get('LogisticsSubType');
+          }
+          
+          // 方法 2: 從頁面文字提取（如果有的話）
+          const pageText = document.body.textContent || '';
+          
+          // 全家物流編號通常是 10 或 12 位數字
+          const serviceCodeMatch = pageText.match(/\b\d{10,12}\b/);
+          if (serviceCodeMatch) {
+            serviceCode = serviceCodeMatch[0];
+          }
+          
+          // 嘗試找訂單編號
+          const orderMatch = pageText.match(/訂單編號[：:]?\s*(\w+)/);
+          if (orderMatch) {
+            orderNo = orderMatch[1];
+          }
+          
+          console.log(`全家物流單 ${index + 1} - 訂單編號: ${orderNo || '未找到'}, 服務代碼: ${serviceCode || '未找到'}`);
+          
+          shippingData.push({
+            html: wrapper.outerHTML,
+            orderNo: orderNo,
+            serviceCode: serviceCode,
+            width: '627px',
+            height: 'auto',
+            index: index,
+            provider: 'family',
+            isImage: true // 標記這是圖片類型的物流單
+          });
+          
+        } catch (error) {
+          console.error(`處理全家物流單 ${index + 1} 時發生錯誤:`, error);
+        }
+      });
+      
+      // 如果沒找到圖片，嘗試其他方式
+      if (shippingData.length === 0) {
+        console.log('未找到物流單圖片，嘗試其他方式...');
+        
+        // 檢查是否有其他形式的物流單
+        const printDivs = document.querySelectorAll('#printDiv, .print-area, [id*="print"]');
+        printDivs.forEach((div, index) => {
+          if (div.innerHTML.trim() && !div.querySelector('button')) {
+            shippingData.push({
+              html: div.innerHTML,
+              orderNo: '',
+              serviceCode: '',
+              width: '627px',
+              height: 'auto',
+              index: index,
+              provider: 'family'
+            });
+          }
+        });
+      }
+    }
+    
+    saveShippingData();
+  }
     
     saveShippingData();
   }
