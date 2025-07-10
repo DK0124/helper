@@ -441,10 +441,7 @@
     
     saveShippingData();
   }
-    
-    saveShippingData();
-  }
-  
+
   // 簡化的圖片處理方式
   async function loadImageAsDataURL(url, imgElement) {
     try {
