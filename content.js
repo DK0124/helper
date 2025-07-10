@@ -60,7 +60,7 @@
       return true;
     });
   }
-  
+
   // 偵測當前頁面類型
   function detectCurrentPage() {
     const hostname = window.location.hostname;
@@ -88,8 +88,10 @@
       return { type: 'shipping', provider: 'okmart' };
     }
     // BV SHOP 後台
-    else if (hostname.includes('bvshop')) {
-      if (pathname.includes('order')) {
+    else if (hostname.includes('bvshop-manage.bvshop.tw')) {
+      // 只針對列印頁面
+      if (pathname === '/order_print' || pathname.includes('order_print')) {
+        console.log('偵測到 BV SHOP 列印頁面');
         return { type: 'detail', provider: 'bvshop' };
       }
     }
