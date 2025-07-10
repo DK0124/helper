@@ -38,7 +38,7 @@
         "*://bvshop-manage.bvshop.tw/*"
       ],
       "js": ["content.js"],
-      "css": ["styles.css"],
+      "css": ["content.css"],
       "run_at": "document_idle"
     }
   ],
