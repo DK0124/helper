@@ -308,110 +308,51 @@
     saveShippingData();
   }
   
-  // 新增函數：將圖片載入為 Data URL
+    // 簡化的圖片處理方式
   async function loadImageAsDataURL(url, imgElement) {
     try {
-      console.log('嘗試載入圖片為 Data URL:', url);
+      console.log('嘗試載入圖片:', url);
       
-      // 使用 fetch 載入圖片
-      const response = await fetch(url, {
-        mode: 'no-cors', // 避免 CORS 問題
-        credentials: 'include' // 包含 cookies
-      });
+      // 創建一個新的 Image 物件
+      const img = new Image();
       
-      // 如果無法獲取 response，使用備用方案
-      if (!response.ok && !response.type === 'opaque') {
-        console.error('無法載入圖片:', response.status);
-        return;
-      }
-      
-      // 創建一個新的 Image 物件來載入圖片
-      const tempImg = new Image();
-      tempImg.crossOrigin = 'anonymous';
-      
-      tempImg.onload = function() {
-        // 創建 canvas 來轉換圖片
-        const canvas = document.createElement('canvas');
-        canvas.width = tempImg.width;
-        canvas.height = tempImg.height;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(tempImg, 0, 0);
-        
-        // 轉換為 data URL
-        try {
-          const dataURL = canvas.toDataURL('image/png');
-          imgElement.src = dataURL;
-          console.log('成功轉換圖片為 Data URL');
-        } catch (e) {
-          console.error('無法轉換圖片為 Data URL:', e);
-        }
+      // 設定載入成功的處理
+      img.onload = function() {
+        // 直接使用原始 URL
+        imgElement.src = url;
+        console.log('圖片載入成功:', url);
       };
       
-      tempImg.onerror = function() {
-        console.error('備用方案：圖片載入失敗');
+      // 設定載入失敗的處理
+      img.onerror = function() {
+        console.error('圖片載入失敗:', url);
+        // 保留原始 src
+        imgElement.src = url;
       };
       
-      tempImg.src = url;
+      // 開始載入
+      img.src = url;
+      
     } catch (error) {
-      console.error('載入圖片時發生錯誤:', error);
+      console.error('處理圖片時發生錯誤:', error);
     }
   }
-
-// 新增函數：將圖片載入為 Data URL
-async function loadImageAsDataURL(url, imgElement) {
-  try {
-    console.log('嘗試載入圖片為 Data URL:', url);
-    
-    // 使用 fetch 載入圖片
-    const response = await fetch(url, {
-      mode: 'no-cors', // 避免 CORS 問題
-      credentials: 'include' // 包含 cookies
-    });
-    
-    // 如果無法獲取 response，使用備用方案
-    if (!response.ok && !response.type === 'opaque') {
-      console.error('無法載入圖片:', response.status);
-      return;
-    }
-    
-    // 創建一個新的 Image 物件來載入圖片
-    const tempImg = new Image();
-    tempImg.crossOrigin = 'anonymous';
-    
-    tempImg.onload = function() {
-      // 創建 canvas 來轉換圖片
-      const canvas = document.createElement('canvas');
-      canvas.width = tempImg.width;
-      canvas.height = tempImg.height;
-      
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(tempImg, 0, 0);
-      
-      // 轉換為 data URL
-      try {
-        const dataURL = canvas.toDataURL('image/png');
-        imgElement.src = dataURL;
-        console.log('成功轉換圖片為 Data URL');
-      } catch (e) {
-        console.error('無法轉換圖片為 Data URL:', e);
-      }
-    };
-    
-    tempImg.onerror = function() {
-      console.error('備用方案：圖片載入失敗');
-    };
-    
-    tempImg.src = url;
-  } catch (error) {
-    console.error('載入圖片時發生錯誤:', error);
-  }
-}
-
+  // 修改 saveShippingData 函數，加入錯誤處理
   function saveShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
     
     try {
+      // 先檢查 chrome.runtime 是否還有效
+      if (!chrome.runtime || !chrome.runtime.id) {
+        console.error('擴充功能上下文已失效，請重新整理頁面');
+        showNotification('擴充功能需要重新載入，請按 F5 重新整理頁面', 'error');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '重新抓取物流單';
+        }
+        return;
+      }
+      
       if (chrome.storage && chrome.storage.local) {
         chrome.storage.local.set({ 
           bvShippingData: shippingData,
@@ -420,15 +361,26 @@ async function loadImageAsDataURL(url, imgElement) {
         }, () => {
           if (chrome.runtime.lastError) {
             console.error('儲存資料時發生錯誤:', chrome.runtime.lastError);
-            btn.disabled = false;
-            btn.innerHTML = '重新抓取物流單';
-            showNotification('儲存資料失敗，請重試', 'error');
+            
+            // 如果是上下文失效錯誤
+            if (chrome.runtime.lastError.message.includes('Extension context invalidated')) {
+              showNotification('擴充功能需要重新載入，請按 F5 重新整理頁面', 'error');
+            } else {
+              showNotification('儲存資料失敗，請重試', 'error');
+            }
+            
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '重新抓取物流單';
+            }
             return;
           }
           
-          btn.disabled = false;
-          btn.innerHTML = '重新抓取物流單';
-          btn.classList.remove('pulse');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '重新抓取物流單';
+            btn.classList.remove('pulse');
+          }
           updateShippingPanelStatus();
           
           if (shippingData.length > 0) {
@@ -442,12 +394,15 @@ async function loadImageAsDataURL(url, imgElement) {
       }
     } catch (error) {
       console.error('儲存資料時發生錯誤:', error);
-      btn.disabled = false;
-      btn.innerHTML = '重新抓取物流單';
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '重新抓取物流單';
+      }
       showNotification('儲存資料失敗，請重新整理頁面後再試', 'error');
     }
   }
-
+  
+  // 修改 checkExtensionValid 函數
   function checkExtensionValid() {
     try {
       if (chrome.runtime && chrome.runtime.id) {
@@ -455,29 +410,42 @@ async function loadImageAsDataURL(url, imgElement) {
       }
     } catch (e) {
       console.error('擴充功能已失效:', e);
-      // 顯示錯誤訊息
-      const existingPanel = document.getElementById('bv-shipping-panel');
-      if (existingPanel) {
-        const errorMsg = document.createElement('div');
-        errorMsg.style.cssText = `
-          position: fixed;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          background: #ff4444;
-          color: white;
-          padding: 20px;
-          border-radius: 8px;
-          z-index: 999999;
-          text-align: center;
-        `;
-        errorMsg.innerHTML = `
-          <h3>擴充功能需要重新載入</h3>
-          <p>請重新整理頁面 (F5) 或重新啟動瀏覽器</p>
-        `;
-        document.body.appendChild(errorMsg);
-      }
     }
+    
+    // 顯示錯誤訊息
+    const existingPanel = document.getElementById('bv-shipping-panel');
+    if (existingPanel) {
+      const errorMsg = document.createElement('div');
+      errorMsg.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #ff4444;
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        z-index: 999999;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      `;
+      errorMsg.innerHTML = `
+        <h3>擴充功能需要重新載入</h3>
+        <p>請按 F5 重新整理頁面</p>
+        <button onclick="location.reload()" style="
+          background: white;
+          color: #ff4444;
+          border: none;
+          padding: 8px 20px;
+          border-radius: 4px;
+          margin-top: 10px;
+          cursor: pointer;
+          font-weight: bold;
+        ">立即重新整理</button>
+      `;
+      document.body.appendChild(errorMsg);
+    }
+    
     return false;
   }
   
