@@ -272,20 +272,31 @@
           // 提取資訊
           let orderNo = '';
           let serviceCode = '';
-          const text = wrapper.textContent || '';
-          
-          const orderMatch = text.match(/(?:寄件)?訂單編號[：:]\s*(\d+)/);
-          if (orderMatch) {
-            orderNo = orderMatch[1];
-          }
-          
+    // 方法 1: 從特定元素取得
           const serviceCodeElement = wrapper.querySelector('span[id*="lblC2BPinCode"]');
           if (serviceCodeElement) {
             serviceCode = serviceCodeElement.textContent.trim();
-          } else {
-            const codeMatch = text.match(/[A-Z]\d{11}/);
+            console.log(`  從 lblC2BPinCode 取得: ${serviceCode}`);
+          }
+          
+          // 方法 2: 從文字中尋找
+          if (!serviceCode) {
+            const text = wrapper.textContent || '';
+            
+            // 尋找 "交貨便服務代碼：" 後面的編號
+            const serviceMatch = text.match(/交貨便服務代碼[：:]\s*([A-Z]\d{11,12})/);
+            if (serviceMatch) {
+              serviceCode = serviceMatch[1];
+              console.log(`  從文字匹配取得: ${serviceCode}`);
+            }
+          }
+          
+          // 方法 3: 尋找任何 F 開頭的編號
+          if (!serviceCode) {
+            const codeMatch = text.match(/F\d{11,12}/);
             if (codeMatch) {
               serviceCode = codeMatch[0];
+              console.log(`  從 F 編號匹配取得: ${serviceCode}`);
             }
           }
           
@@ -299,11 +310,11 @@
             height: computedStyle.height,
             index: index
           });
+          
         } catch (error) {
           console.error(`處理物流單 ${index + 1} 時發生錯誤:`, error);
         }
       });
-    }
     
     saveShippingData();
   }
