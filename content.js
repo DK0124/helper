@@ -1373,6 +1373,73 @@
     
     return pages;
   }
+
+  // 生成物流單頁面
+  function generateShippingPage(data, settings, customOrderNo) {
+    if (!data) return '';
+    
+    const displayOrderNo = customOrderNo || data.orderNo;
+    
+    // 始終使用 100mm x 150mm
+    return `
+      <div class="bv-shipping-content" style="
+        width: 100mm;
+        height: 150mm;
+        position: relative;
+        overflow: hidden;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      ">
+        <!-- 底圖（最底層） -->
+        ${settings.shipping.logo ? `
+          <img src="${settings.shipping.logo}" 
+               class="bv-watermark-logo"
+               style="
+                 position: absolute;
+                 top: ${settings.shipping.logoY}%;
+                 left: ${settings.shipping.logoX}%;
+                 transform: translate(-50%, -50%);
+                 width: ${settings.shipping.logoSize}mm;
+                 opacity: ${settings.shipping.logoOpacity / 100};
+                 --opacity: ${settings.shipping.logoOpacity / 100};
+                 pointer-events: none;
+                 z-index: 1;
+               ">
+        ` : ''}
+        
+        <!-- 物流單內容 -->
+        <div style="z-index: 2; position: relative;">
+          ${data.html}
+        </div>
+        
+        <!-- 訂單編號標籤（最上層） -->
+        ${settings.showOrderNumber && displayOrderNo ? `
+          <div style="
+            position: absolute;
+            top: ${settings.orderLabelTop}mm;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 4px 12px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: ${settings.orderLabelSize}px;
+            font-weight: bold;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            white-space: nowrap;
+          ">
+            訂單編號：${displayOrderNo}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
   
   function generateDetailPage(data, settings) {
     if (!data || !data.orderInfo) return '';
