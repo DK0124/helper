@@ -1426,7 +1426,7 @@
     
     const displayOrderNo = customOrderNo || data.orderNo;
     
-    // 始終使用 100mm x 150mm
+    // 更簡潔的版本，保持原始排版
     return `
       <div class="bv-shipping-content" style="
         width: 100mm;
@@ -1434,14 +1434,14 @@
         position: relative;
         overflow: hidden;
         background: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         margin: 0;
         padding: 0;
         box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       ">
-        <!-- 底圖（最底層） -->
+        <!-- 底圖（如果有的話） -->
         ${settings.shipping.logo ? `
           <img src="${settings.shipping.logo}" 
                class="bv-watermark-logo"
@@ -1452,35 +1452,35 @@
                  transform: translate(-50%, -50%);
                  width: ${settings.shipping.logoSize}mm;
                  opacity: ${settings.shipping.logoOpacity / 100};
-                 --opacity: ${settings.shipping.logoOpacity / 100};
                  pointer-events: none;
                  z-index: 1;
                ">
         ` : ''}
         
-        <!-- 物流單內容 -->
-        <div style="z-index: 2; position: relative;">
+        <!-- 物流單內容 - 保持原始排版 -->
+        <div style="
+          position: relative;
+          z-index: 2;
+        ">
           ${data.html}
         </div>
         
-        <!-- 訂單編號標籤（最上層） -->
+        <!-- 訂單編號標籤 - 改為更小且不影響排版 -->
         ${settings.showOrderNumber && displayOrderNo ? `
           <div style="
             position: absolute;
             top: ${settings.orderLabelTop}mm;
-            left: 50%;
-            transform: translateX(-50%);
+            right: 5mm;
             background: white;
-            padding: 4px 12px;
+            padding: 2px 6px;
             border: 1px solid #333;
-            border-radius: 4px;
+            border-radius: 3px;
             font-size: ${settings.orderLabelSize}px;
-            font-weight: bold;
+            font-weight: normal;
             z-index: 1000;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             white-space: nowrap;
           ">
-            訂單編號：${displayOrderNo}
+            訂單：${displayOrderNo}
           </div>
         ` : ''}
       </div>
