@@ -204,10 +204,12 @@
           // 複製內部 HTML
           wrapper.innerHTML = frame.innerHTML;
           
-          // 處理所有圖片
+          // 處理所有圖片 - 特別處理 QR Code
           const images = wrapper.querySelectorAll('img');
+          const originalImages = frame.querySelectorAll('img');
+          
           images.forEach((img, imgIndex) => {
-            const originalImg = frame.querySelectorAll('img')[imgIndex];
+            const originalImg = originalImages[imgIndex];
             if (originalImg) {
               // 複製計算後的樣式
               const imgStyle = window.getComputedStyle(originalImg);
@@ -215,9 +217,31 @@
               img.style.height = imgStyle.height;
               img.style.display = imgStyle.display;
               
-              // 確保 src 是完整 URL
-              if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('http')) {
-                img.src = new URL(img.src, window.location.href).href;
+              // 獲取完整的圖片 URL
+              let srcUrl = originalImg.src || originalImg.getAttribute('src');
+              
+              // 如果是相對路徑，轉換為絕對路徑
+              if (srcUrl && !srcUrl.startsWith('data:') && !srcUrl.startsWith('http')) {
+                srcUrl = new URL(srcUrl, window.location.href).href;
+              }
+              
+              // 設定 src
+              img.src = srcUrl;
+              
+              // 為 QR Code 圖片添加特殊處理
+              if (srcUrl && (srcUrl.includes('QRCode') || srcUrl.includes('qrcode'))) {
+                console.log('找到 QR Code 圖片:', srcUrl);
+                
+                // 確保圖片顯示
+                img.style.display = 'inline-block';
+                img.style.visibility = 'visible';
+                
+                // 如果圖片載入失敗，嘗試重新載入
+                img.onerror = function() {
+                  console.error('QR Code 載入失敗:', srcUrl);
+                  // 嘗試使用 fetch 載入圖片
+                  loadImageAsDataURL(srcUrl, img);
+                };
               }
             }
           });
@@ -283,6 +307,106 @@
     
     saveShippingData();
   }
+  
+  // 新增函數：將圖片載入為 Data URL
+  async function loadImageAsDataURL(url, imgElement) {
+    try {
+      console.log('嘗試載入圖片為 Data URL:', url);
+      
+      // 使用 fetch 載入圖片
+      const response = await fetch(url, {
+        mode: 'no-cors', // 避免 CORS 問題
+        credentials: 'include' // 包含 cookies
+      });
+      
+      // 如果無法獲取 response，使用備用方案
+      if (!response.ok && !response.type === 'opaque') {
+        console.error('無法載入圖片:', response.status);
+        return;
+      }
+      
+      // 創建一個新的 Image 物件來載入圖片
+      const tempImg = new Image();
+      tempImg.crossOrigin = 'anonymous';
+      
+      tempImg.onload = function() {
+        // 創建 canvas 來轉換圖片
+        const canvas = document.createElement('canvas');
+        canvas.width = tempImg.width;
+        canvas.height = tempImg.height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(tempImg, 0, 0);
+        
+        // 轉換為 data URL
+        try {
+          const dataURL = canvas.toDataURL('image/png');
+          imgElement.src = dataURL;
+          console.log('成功轉換圖片為 Data URL');
+        } catch (e) {
+          console.error('無法轉換圖片為 Data URL:', e);
+        }
+      };
+      
+      tempImg.onerror = function() {
+        console.error('備用方案：圖片載入失敗');
+      };
+      
+      tempImg.src = url;
+    } catch (error) {
+      console.error('載入圖片時發生錯誤:', error);
+    }
+  }
+
+// 新增函數：將圖片載入為 Data URL
+async function loadImageAsDataURL(url, imgElement) {
+  try {
+    console.log('嘗試載入圖片為 Data URL:', url);
+    
+    // 使用 fetch 載入圖片
+    const response = await fetch(url, {
+      mode: 'no-cors', // 避免 CORS 問題
+      credentials: 'include' // 包含 cookies
+    });
+    
+    // 如果無法獲取 response，使用備用方案
+    if (!response.ok && !response.type === 'opaque') {
+      console.error('無法載入圖片:', response.status);
+      return;
+    }
+    
+    // 創建一個新的 Image 物件來載入圖片
+    const tempImg = new Image();
+    tempImg.crossOrigin = 'anonymous';
+    
+    tempImg.onload = function() {
+      // 創建 canvas 來轉換圖片
+      const canvas = document.createElement('canvas');
+      canvas.width = tempImg.width;
+      canvas.height = tempImg.height;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(tempImg, 0, 0);
+      
+      // 轉換為 data URL
+      try {
+        const dataURL = canvas.toDataURL('image/png');
+        imgElement.src = dataURL;
+        console.log('成功轉換圖片為 Data URL');
+      } catch (e) {
+        console.error('無法轉換圖片為 Data URL:', e);
+      }
+    };
+    
+    tempImg.onerror = function() {
+      console.error('備用方案：圖片載入失敗');
+    };
+    
+    tempImg.src = url;
+  } catch (error) {
+    console.error('載入圖片時發生錯誤:', error);
+  }
+}
 
   function saveShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
