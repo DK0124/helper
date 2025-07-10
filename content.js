@@ -1678,6 +1678,29 @@ async function loadImageAsDataURL(url, imgElement) {
           margin: 0 auto !important;
           transform: none !important;
         }
+
+        /* 確保圖片正確顯示 */
+        img {
+          display: inline-block !important;
+          visibility: visible !important;
+          max-width: none !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+        
+        /* 特別處理 QR Code */
+        img[src*="QRCode"],
+        img[src*="qrcode"],
+        img[src*="SendQRCode"],
+        img#ctl00_Bill1_sendQRCode,
+        img#ctl00_Bill1_QRCODE {
+          display: inline-block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          width: auto !important;
+          height: auto !important;
+        }
         
         /* 確保圖片和顏色正確顯示 */
         * {
