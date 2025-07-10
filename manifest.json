@@ -11,8 +11,7 @@
   },
   "permissions": [
     "activeTab",
-    "storage",
-    "scripting"
+    "storage"
   ],
   "host_permissions": [
     "*://*.7-11.com.tw/*",
@@ -43,22 +42,11 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     },
     "default_title": "BV SHOP 出貨助手"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "icons/icon-16.png",
-        "icons/icon-48.png",
-        "icons/icon-128.png"
-      ],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }
