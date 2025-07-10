@@ -1245,9 +1245,31 @@
       }
     });
     
-    // 超商類型切換
+    // 確保在切換超商類型時立即更新預覽
     document.getElementById('bv-shipping-provider')?.addEventListener('change', (e) => {
       loadProviderSettings(e.target.value);
+      // 立即更新預覽
+      setTimeout(() => updatePreview(), 100);
+    });
+    
+    // 確保拖動滑桿時儲存設定
+    ['shipping-scale', 'shipping-offset-x', 'shipping-offset-y', 'shipping-padding'].forEach(id => {
+      const element = document.getElementById('bv-' + id);
+      if (element) {
+        element.addEventListener('input', () => {
+          updateValueDisplay(id);
+          updateRangeProgress(element);
+          // 更新當前超商的快取設定
+          const provider = document.getElementById('bv-shipping-provider')?.value || 'default';
+          cachedProviderSettings[provider] = {
+            scale: parseInt(document.getElementById('bv-shipping-scale').value),
+            offsetX: parseInt(document.getElementById('bv-shipping-offset-x').value),
+            offsetY: parseInt(document.getElementById('bv-shipping-offset-y').value),
+            padding: parseInt(document.getElementById('bv-shipping-padding').value)
+          };
+          updatePreview(); // 即時預覽
+        });
+      }
     });
     
     // 儲存超商設定
