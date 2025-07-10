@@ -10,6 +10,7 @@
   let detailData = [];
   let savedLogos = { shipping: null, detail: null };
   let panelActive = false;
+  let cachedProviderSettings = {};
   
   // 立即通知 background script
   if (chrome.runtime && chrome.runtime.sendMessage) {
@@ -1018,6 +1019,9 @@
     // 初始化預設系統
     initPresetSystem();
   }
+
+    // 載入所有超商設定
+    loadAllProviderSettings();
   
   function fetchDetailData() {
     console.log('開始抓取明細');
@@ -1256,6 +1260,7 @@
   }
   
   // 載入特定超商的設定
+  // 修改 loadProviderSettings 函數，同時更新快取
   function loadProviderSettings(provider) {
     if (chrome.storage && chrome.storage.local) {
       chrome.storage.local.get([`bvProviderSettings_${provider}`], (result) => {
@@ -1265,6 +1270,9 @@
           offsetY: 0,
           padding: 0
         };
+        
+        // 更新快取
+        cachedProviderSettings[provider] = settings;
         
         // 更新控制項
         document.getElementById('bv-shipping-scale').value = settings.scale;
@@ -1284,7 +1292,7 @@
     }
   }
   
-  // 儲存超商設定
+  // 修改 saveProviderSettings 函數，同時更新快取
   function saveProviderSettings() {
     const provider = document.getElementById('bv-shipping-provider').value;
     const settings = {
@@ -1293,6 +1301,9 @@
       offsetY: parseInt(document.getElementById('bv-shipping-offset-y').value),
       padding: parseInt(document.getElementById('bv-shipping-padding').value)
     };
+    
+    // 更新快取
+    cachedProviderSettings[provider] = settings;
     
     if (chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({
@@ -1537,90 +1548,104 @@
     return pages;
   }
 
-  function generateShippingPage(data, settings, customOrderNo) {
-    if (!data) return '';
-    
-    const displayOrderNo = customOrderNo || data.orderNo;
-    
-    // 取得當前的超商類型（從儲存的資料或自動偵測）
-    const provider = data.provider || detectProviderFromHTML(data.html) || 'default';
-    
-    // 取得該超商的排版設定
-    const layoutSettings = settings.shipping.providerSettings?.[provider] || {
-      scale: 100,
-      offsetX: 0,
-      offsetY: 0,
-      padding: 0
-    };
-    
-    return `
-      <div class="bv-shipping-content" style="
-        width: 100mm;
-        height: 150mm;
+// 修改 generateShippingPage 函數
+function generateShippingPage(data, settings, customOrderNo) {
+  if (!data) return '';
+  
+  const displayOrderNo = customOrderNo || data.orderNo;
+  
+  // 取得當前的超商類型（從儲存的資料或自動偵測）
+  const provider = data.provider || detectProviderFromHTML(data.html) || 'default';
+  
+  // 使用當前超商的設定，如果沒有則使用即時設定
+  const layoutSettings = settings.shipping.currentProviderSettings || 
+                        settings.shipping.providerSettings?.[provider] || {
+    scale: 100,
+    offsetX: 0,
+    offsetY: 0,
+    padding: 0
+  };
+  
+  return `
+    <div class="bv-shipping-content" style="
+      width: 100mm;
+      height: 150mm;
+      position: relative;
+      overflow: hidden;
+      background: white;
+      margin: 0;
+      padding: ${layoutSettings.padding}mm;
+      box-sizing: border-box;
+    ">
+      <!-- 底圖（最底層） -->
+      ${settings.shipping.logo ? `
+        <img src="${settings.shipping.logo}" 
+             class="bv-watermark-logo"
+             style="
+               position: absolute;
+               top: ${settings.shipping.logoY}%;
+               left: ${settings.shipping.logoX}%;
+               transform: translate(-50%, -50%);
+               width: ${settings.shipping.logoSize}mm;
+               opacity: ${settings.shipping.logoOpacity / 100};
+               --opacity: ${settings.shipping.logoOpacity / 100};
+               pointer-events: none;
+               z-index: 1;
+             ">
+      ` : ''}
+      
+      <!-- 物流單內容 - 加入排版調整 -->
+      <div style="
+        z-index: 2;
         position: relative;
-        overflow: hidden;
-        background: white;
-        margin: 0;
-        padding: ${layoutSettings.padding}mm;
-        box-sizing: border-box;
+        transform: scale(${layoutSettings.scale / 100}) translate(${layoutSettings.offsetX}mm, ${layoutSettings.offsetY}mm);
+        transform-origin: center center;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       ">
-        <!-- 底圖（最底層） -->
-        ${settings.shipping.logo ? `
-          <img src="${settings.shipping.logo}" 
-               class="bv-watermark-logo"
-               style="
-                 position: absolute;
-                 top: ${settings.shipping.logoY}%;
-                 left: ${settings.shipping.logoX}%;
-                 transform: translate(-50%, -50%);
-                 width: ${settings.shipping.logoSize}mm;
-                 opacity: ${settings.shipping.logoOpacity / 100};
-                 --opacity: ${settings.shipping.logoOpacity / 100};
-                 pointer-events: none;
-                 z-index: 1;
-               ">
-        ` : ''}
-        
-        <!-- 物流單內容 - 加入排版調整 -->
-        <div style="
-          z-index: 2;
-          position: relative;
-          transform: scale(${layoutSettings.scale / 100}) translate(${layoutSettings.offsetX}mm, ${layoutSettings.offsetY}mm);
-          transform-origin: center center;
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        ">
-          <div class="bv-shipping-wrapper-inner">
-            ${data.html}
-          </div>
+        <div class="bv-shipping-wrapper-inner">
+          ${data.html}
         </div>
-        
-        <!-- 訂單編號標籤（最上層） -->
-        ${settings.showOrderNumber && displayOrderNo ? `
-          <div style="
-            position: absolute;
-            top: ${settings.orderLabelTop}mm;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 4px 12px;
-            border: 1px solid #333;
-            border-radius: 4px;
-            font-size: ${settings.orderLabelSize}px;
-            font-weight: bold;
-            z-index: 1000;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            white-space: nowrap;
-          ">
-            訂單編號：${displayOrderNo}
-          </div>
-        ` : ''}
       </div>
-    `;
-  }
+      
+      <!-- 訂單編號標籤（最上層） -->
+      ${settings.showOrderNumber && displayOrderNo ? `
+        <div style="
+          position: absolute;
+          top: ${settings.orderLabelTop}mm;
+          left: 50%;
+          transform: translateX(-50%);
+          background: white;
+          padding: 4px 12px;
+          border: 1px solid #333;
+          border-radius: 4px;
+          font-size: ${settings.orderLabelSize}px;
+          font-weight: bold;
+          z-index: 1000;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          white-space: nowrap;
+        ">
+          訂單編號：${displayOrderNo}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+// 在初始化時載入所有超商的設定
+function loadAllProviderSettings() {
+  ['default', 'seven', 'family', 'hilife', 'okmart'].forEach(provider => {
+    if (chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get([`bvProviderSettings_${provider}`], (result) => {
+        if (result[`bvProviderSettings_${provider}`]) {
+          cachedProviderSettings[provider] = result[`bvProviderSettings_${provider}`];
+        }
+      });
+    }
+  });
+}
   
   // 新增：從 HTML 內容偵測超商類型
   function detectProviderFromHTML(html) {
@@ -1992,21 +2017,18 @@
     input.style.setProperty('--value', value + '%');
   }
   
+  // 修改 getSettings 函數
   function getSettings() {
-    // 取得所有超商的設定
-    const providerSettings = {};
-    ['default', 'seven', 'family', 'hilife', 'okmart'].forEach(provider => {
-      // 從 chrome.storage 取得設定
-      const settingsKey = `bvProviderSettings_${provider}`;
-      // 這裡使用同步的方式，實際上應該要用非同步
-      // 但為了簡化，我們先用預設值
-      providerSettings[provider] = {
-        scale: 100,
-        offsetX: 0,
-        offsetY: 0,
-        padding: 0
-      };
-    });
+    // 取得當前選擇的超商
+    const currentProvider = document.getElementById('bv-shipping-provider')?.value || 'default';
+    
+    // 從快取或即時設定取得
+    const currentProviderSettings = cachedProviderSettings[currentProvider] || {
+      scale: parseInt(document.getElementById('bv-shipping-scale')?.value || 100),
+      offsetX: parseInt(document.getElementById('bv-shipping-offset-x')?.value || 0),
+      offsetY: parseInt(document.getElementById('bv-shipping-offset-y')?.value || 0),
+      padding: parseInt(document.getElementById('bv-shipping-padding')?.value || 0)
+    };
     
     return {
       paper: {
@@ -2024,7 +2046,8 @@
         logoX: parseInt(document.getElementById('bv-shipping-logo-x')?.value || 50),
         logoY: parseInt(document.getElementById('bv-shipping-logo-y')?.value || 50),
         logoOpacity: parseInt(document.getElementById('bv-shipping-logo-opacity')?.value || 20),
-        providerSettings: providerSettings // 新增超商特定設定
+        providerSettings: cachedProviderSettings,
+        currentProviderSettings: currentProviderSettings // 當前超商的設定
       },
       detail: {
         textSize: document.getElementById('bv-detail-text-size')?.value || '14px',
