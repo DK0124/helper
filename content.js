@@ -110,59 +110,38 @@
   function injectShippingPanel() {
     if (document.getElementById('bv-shipping-panel')) return;
     
-    // 建立浮動面板
-    const panel = document.createElement('div');
-    panel.id = 'bv-shipping-panel';
-    panel.style.cssText = `
+    // 創建一個浮動按鈕
+    const floatBtn = document.createElement('div');
+    floatBtn.id = 'bv-shipping-panel';
+    floatBtn.style.cssText = `
       position: fixed !important;
-      top: 10px !important;
-      right: 10px !important;
-      background: white !important;
-      border-radius: 12px !important;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+      bottom: 30px !important;
+      right: 30px !important;
+      width: 60px !important;
+      height: 60px !important;
+      background: #5865F2 !important;
+      border-radius: 50% !important;
+      box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4) !important;
+      cursor: pointer !important;
       z-index: 2147483647 !important;
-      padding: 15px !important;
-      min-width: 200px !important;
-      font-family: Arial, sans-serif !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      color: white !important;
+      font-size: 24px !important;
+      font-weight: bold !important;
     `;
     
-    panel.innerHTML = `
-      <div style="text-align: center;">
-        <h4 style="margin: 0 0 10px 0; color: #333;">BV 出貨助手</h4>
-        <div style="margin-bottom: 10px;">
-          <span id="bv-count" style="font-size: 24px; font-weight: bold; color: #5865F2;">0</span>
-          <span style="color: #666;"> 張已抓取</span>
-        </div>
-        <button id="bv-fetch-btn" style="
-          background: #5865F2;
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-weight: bold;
-          width: 100%;
-        ">
-          抓取物流單
-        </button>
-      </div>
-    `;
+    floatBtn.innerHTML = '<span id="bv-count">0</span>';
+    floatBtn.title = '點擊抓取物流單';
     
-    // 強制插入到 body 的第一個子元素
-    document.body.insertBefore(panel, document.body.firstChild);
+    document.body.appendChild(floatBtn);
     
-    // 事件監聽
-    document.getElementById('bv-fetch-btn').addEventListener('click', fetchShippingData);
+    // 點擊事件
+    floatBtn.addEventListener('click', fetchShippingData);
     
     // 更新狀態
     updateShippingPanelStatus();
-    
-    // 每秒檢查面板是否還存在，如果被移除就重新加入
-    setInterval(() => {
-      if (!document.getElementById('bv-shipping-panel')) {
-        document.body.insertBefore(panel, document.body.firstChild);
-      }
-    }, 1000);
   }
   
   function updateShippingPanelStatus() {
