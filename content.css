@@ -11,7 +11,7 @@
   background: white;
   border-radius: 20px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
-  z-index: 99999;
+  z-index: 2147483647; /* 改為最大值，確保在最上層 */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Helvetica Neue", Arial, sans-serif;
   animation: slideIn 0.3s ease-out;
   width: 320px;
