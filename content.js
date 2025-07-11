@@ -2895,37 +2895,72 @@
   }
   
   // === 主程式執行 ===
-  
-  // 根據頁面類型自動執行對應的初始化
   if (currentPage.type === 'shipping') {
-    // 物流單頁自動顯示面板
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        if (checkExtensionValid()) {
-          setTimeout(injectShippingPanel, 300);
+    // 等待頁面完全載入
+    const checkAndInject = () => {
+      // 檢查是否有 iframe
+      const iframes = document.querySelectorAll('iframe');
+      let injected = false;
+      
+      iframes.forEach(iframe => {
+        try {
+          if (iframe.contentDocument && iframe.contentDocument.body) {
+            // 嘗試在 iframe 內注入
+            const iframeDoc = iframe.contentDocument;
+            if (!iframeDoc.getElementById('bv-shipping-panel')) {
+              const panel = createPanel();
+              iframeDoc.body.appendChild(panel);
+              injected = true;
+            }
+          }
+        } catch (e) {
+          console.log('無法訪問 iframe:', e);
         }
       });
-    } else {
-      if (checkExtensionValid()) {
-        setTimeout(injectShippingPanel, 300);
+      
+      // 如果沒有 iframe 或無法注入，就在主頁面注入
+      if (!injected && !document.getElementById('bv-shipping-panel')) {
+        injectShippingPanel();
       }
-    }
-  } else if (currentPage.type === 'detail') {
-    // 明細頁也自動啟動
-    console.log('BV SHOP 出貨明細頁面已偵測，自動啟動助手');
+    };
     
-    // 自動啟動面板
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-          activateDetailPanel();
-        }, 500); // 給頁面一點時間載入完成
-      });
-    } else {
-      setTimeout(() => {
-        activateDetailPanel();
-      }, 500);
-    }
+    // 延遲執行，確保頁面載入完成
+    setTimeout(checkAndInject, 1000);
+    setTimeout(checkAndInject, 2000);
+    setTimeout(checkAndInject, 3000);
+  }
+  
+  function createPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'bv-shipping-panel';
+    panel.style.cssText = `
+      position: fixed !important;
+      top: 20px !important;
+      right: 20px !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+      border: 2px solid #5865F2 !important;
+      border-radius: 8px !important;
+      padding: 12px !important;
+      z-index: 2147483647 !important;
+      backdrop-filter: blur(10px) !important;
+    `;
+    
+    panel.innerHTML = `
+      <button id="bv-fetch-btn" style="
+        background: #5865F2;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 16px;
+      ">
+        抓取嘉里大榮物流單
+      </button>
+    `;
+    
+    return panel;
   }
   
 })();
