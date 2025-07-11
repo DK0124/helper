@@ -111,45 +111,40 @@
   function injectShippingPanel() {
     if (document.getElementById('bv-shipping-panel')) return;
     
-    // 建立浮動面板
+    // 建立浮動面板 - 改為頂部橫幅
     const panel = document.createElement('div');
     panel.id = 'bv-shipping-panel';
+    panel.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      background: white !important;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+      z-index: 2147483647 !important;
+      padding: 10px 20px !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 20px !important;
+    `;
+    
     panel.innerHTML = `
-      <div class="bv-panel-header">
-        <h3>BV SHOP 出貨助手</h3>
-        <div class="bv-panel-controls">
-          <button class="bv-icon-btn" id="bv-minimize-btn" title="最小化">
-            <span style="font-size: 20px; line-height: 1;">－</span>
-          </button>
-        </div>
+      <h3 style="margin: 0; font-size: 16px;">BV SHOP 出貨助手</h3>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span id="bv-count" style="font-weight: bold;">0</span>
+        <span>張物流單已抓取</span>
       </div>
-      
-      <div class="bv-panel-body">
-        <div class="bv-status-display">
-          <div class="bv-status-count" id="bv-count">0</div>
-          <div class="bv-status-text">張物流單已抓取</div>
-        </div>
-        
-        <button class="bv-button primary pulse" id="bv-fetch-btn">
-          重新抓取物流單
-        </button>
-        
-        <div class="bv-info-text">
-          <strong>操作步驟：</strong><br>
-          1. 點擊「重新抓取物流單」<br>
-          2. 至後台「更多操作」>「列印出貨單」<br>
-          3. 點選擴充功能中的「BV SHOP 出貨助手」
-        </div>
-      </div>
+      <button class="bv-button primary pulse" id="bv-fetch-btn" style="
+        padding: 8px 16px;
+        font-size: 14px;
+      ">
+        重新抓取物流單
+      </button>
     `;
     
     document.body.appendChild(panel);
     
     // 事件監聽
-    document.getElementById('bv-minimize-btn').addEventListener('click', () => {
-      panel.classList.toggle('minimized');
-    });
-    
     document.getElementById('bv-fetch-btn').addEventListener('click', fetchShippingData);
     
     // 更新狀態
