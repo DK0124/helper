@@ -106,49 +106,63 @@
     return { type: 'unknown', provider: null };
   }
   
-  // === 物流單頁面專用函數 ===
-  
+  // 修改 injectShippingPanel 函數
   function injectShippingPanel() {
     if (document.getElementById('bv-shipping-panel')) return;
     
-    // 建立浮動面板 - 改為頂部橫幅
+    // 建立浮動面板
     const panel = document.createElement('div');
     panel.id = 'bv-shipping-panel';
     panel.style.cssText = `
       position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
+      top: 10px !important;
+      right: 10px !important;
       background: white !important;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
       z-index: 2147483647 !important;
-      padding: 10px 20px !important;
-      display: flex !important;
-      align-items: center !important;
-      gap: 20px !important;
+      padding: 15px !important;
+      min-width: 200px !important;
+      font-family: Arial, sans-serif !important;
     `;
     
     panel.innerHTML = `
-      <h3 style="margin: 0; font-size: 16px;">BV SHOP 出貨助手</h3>
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span id="bv-count" style="font-weight: bold;">0</span>
-        <span>張物流單已抓取</span>
+      <div style="text-align: center;">
+        <h4 style="margin: 0 0 10px 0; color: #333;">BV 出貨助手</h4>
+        <div style="margin-bottom: 10px;">
+          <span id="bv-count" style="font-size: 24px; font-weight: bold; color: #5865F2;">0</span>
+          <span style="color: #666;"> 張已抓取</span>
+        </div>
+        <button id="bv-fetch-btn" style="
+          background: #5865F2;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: bold;
+          width: 100%;
+        ">
+          抓取物流單
+        </button>
       </div>
-      <button class="bv-button primary pulse" id="bv-fetch-btn" style="
-        padding: 8px 16px;
-        font-size: 14px;
-      ">
-        重新抓取物流單
-      </button>
     `;
     
-    document.body.appendChild(panel);
+    // 強制插入到 body 的第一個子元素
+    document.body.insertBefore(panel, document.body.firstChild);
     
     // 事件監聽
     document.getElementById('bv-fetch-btn').addEventListener('click', fetchShippingData);
     
     // 更新狀態
     updateShippingPanelStatus();
+    
+    // 每秒檢查面板是否還存在，如果被移除就重新加入
+    setInterval(() => {
+      if (!document.getElementById('bv-shipping-panel')) {
+        document.body.insertBefore(panel, document.body.firstChild);
+      }
+    }, 1000);
   }
   
   function updateShippingPanelStatus() {
