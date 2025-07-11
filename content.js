@@ -91,7 +91,13 @@
     }
     // BV SHOP 後台
     else if (hostname.includes('bvshop-manage.bvshop.tw')) {
-      if (pathname === '/order_print' || pathname.includes('order_print')) {
+      // 嘉里大榮物流單
+      if (pathname.includes('order_multi_print_ktj_logistics')) {
+        console.log('偵測到嘉里大榮物流單頁面');
+        return { type: 'shipping', provider: 'ktj' };
+      }
+      // 出貨明細
+      else if (pathname === '/order_print' || pathname.includes('order_print')) {
         console.log('偵測到 BV SHOP 列印頁面');
         return { type: 'detail', provider: 'bvshop' };
       }
@@ -328,7 +334,6 @@
         }
       });
     }
-
     // 新增：全家超商抓取邏輯
     else if (currentPage.provider === 'family') {
       console.log('開始抓取全家物流單');
@@ -438,7 +443,174 @@
         });
       }
     }
+    // 新增：嘉里大榮處理邏輯
+    else if (currentPage.provider === 'ktj') {
+      console.log('開始抓取嘉里大榮物流單');
+      
+      // 直接轉換 PDF 為圖片
+      convertKTJToImages();
+    }
     
+    // 儲存物流單資料
+    if (currentPage.provider !== 'ktj') {
+      // 非嘉里大榮直接儲存
+      saveShippingData();
+    }
+    // 嘉里大榮會在 convertKTJToImages 函數內部呼叫 saveShippingData
+  }
+
+  // 簡化版：將 PDF 轉換為圖片
+  async function convertKTJToImages() {
+    const btn = document.getElementById('bv-fetch-btn');
+    
+    try {
+      btn.innerHTML = '正在轉換 PDF...';
+      
+      // 1. 載入 PDF.js（使用 CDN）
+      if (!window.pdfjsLib) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      
+      // 2. 獲取 PDF
+      const response = await fetch(window.location.href, {
+        credentials: 'same-origin'
+      });
+      const pdfData = await response.arrayBuffer();
+      
+      // 3. 載入 PDF 文件
+      const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+      console.log(`PDF 共有 ${pdf.numPages} 頁`);
+      
+      // 4. 將每一頁轉換為圖片
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        
+        // 使用固定的縮放比例，確保清晰度
+        const scale = 2; // 2x 解析度，確保列印清晰
+        const viewport = page.getViewport({ scale });
+        
+        // 創建 canvas
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        // 渲染 PDF 頁面
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+        
+        // 轉換為圖片 data URL
+        const imgDataUrl = canvas.toDataURL('image/png', 0.95);
+        
+        // 創建包裝，保持原始尺寸比例
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bv-shipping-wrapper';
+        wrapper.style.cssText = `
+          width: 100%;
+          max-width: 105mm;
+          margin: 0 auto;
+          background: white;
+          position: relative;
+        `;
+        
+        wrapper.innerHTML = `
+          <img src="${imgDataUrl}" 
+               style="width: 100%; 
+                      height: auto; 
+                      display: block;">
+        `;
+        
+        // 簡單的訂單編號（從 URL 參數提取）
+        const urlParams = new URLSearchParams(window.location.search);
+        const ids = urlParams.get('ids')?.split(',') || [];
+        const orderNo = ids[pageNum - 1] || `KTJ-${pageNum}`;
+        
+        shippingData.push({
+          html: wrapper.outerHTML,
+          orderNo: orderNo,
+          serviceCode: `KTJ${orderNo}`,
+          width: '105mm',
+          height: '148mm',
+          index: pageNum - 1,
+          provider: 'ktj',
+          isImage: true
+        });
+        
+        btn.innerHTML = `處理中... (${pageNum}/${pdf.numPages})`;
+      }
+      
+      console.log(`成功轉換 ${shippingData.length} 張嘉里大榮物流單`);
+      btn.innerHTML = '重新抓取物流單';
+      btn.disabled = false;
+      
+      saveShippingData();
+      
+    } catch (error) {
+      console.error('轉換嘉里大榮 PDF 時發生錯誤:', error);
+      
+      // 如果轉換失敗，提供簡單的提示
+      createKTJPlaceholder();
+    }
+  }
+
+  // 創建佔位符（當無法轉換時）
+  function createKTJPlaceholder() {
+    const btn = document.getElementById('bv-fetch-btn');
+    
+    // 從 URL 獲取訂單 ID
+    const urlParams = new URLSearchParams(window.location.search);
+    const ids = urlParams.get('ids')?.split(',') || ['未知'];
+    
+    ids.forEach((id, index) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'bv-shipping-wrapper';
+      wrapper.style.cssText = `
+        width: 105mm;
+        height: 148mm;
+        border: 2px dashed #ccc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f9f9f9;
+        position: relative;
+      `;
+      
+      wrapper.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+          <h3 style="color: #666;">嘉里大榮物流單</h3>
+          <p>訂單編號：${id}</p>
+          <p style="color: #999; font-size: 12px; margin-top: 20px;">
+            請使用瀏覽器列印功能<br>
+            直接列印 PDF 檔案
+          </p>
+        </div>
+      `;
+      
+      shippingData.push({
+        html: wrapper.outerHTML,
+        orderNo: id,
+        serviceCode: `KTJ${id}`,
+        width: '105mm',
+        height: '148mm',
+        index: index,
+        provider: 'ktj',
+        isPlaceholder: true
+      });
+    });
+    
+    btn.innerHTML = '重新抓取物流單';
+    btn.disabled = false;
     saveShippingData();
   }
 
@@ -1134,7 +1306,7 @@
   
     // 載入所有超商設定
     loadAllProviderSettings();  
-}
+  }
   
   function fetchDetailData() {
     console.log('開始抓取明細');
@@ -1683,104 +1855,105 @@
     return pages;
   }
 
-// 修改 generateShippingPage 函數
-function generateShippingPage(data, settings, customOrderNo) {
-  if (!data) return '';
-  
-  const displayOrderNo = customOrderNo || data.orderNo;
-  
-  // 取得當前的超商類型（從儲存的資料或自動偵測）
-  const provider = data.provider || detectProviderFromHTML(data.html) || 'default';
-  
-  // 使用當前超商的設定，如果沒有則使用即時設定
-  const layoutSettings = settings.shipping.currentProviderSettings || 
-                        settings.shipping.providerSettings?.[provider] || {
-    scale: 100,
-    offsetX: 0,
-    offsetY: 0,
-    padding: 0
-  };
-  
-  return `
-    <div class="bv-shipping-content" style="
-      width: 100mm;
-      height: 150mm;
-      position: relative;
-      overflow: hidden;
-      background: white;
-      margin: 0;
-      padding: ${layoutSettings.padding}mm;
-      box-sizing: border-box;
-    ">
-      <!-- 底圖（最底層） -->
-      ${settings.shipping.logo ? `
-        <img src="${settings.shipping.logo}" 
-             class="bv-watermark-logo"
-             style="
-               position: absolute;
-               top: ${settings.shipping.logoY}%;
-               left: ${settings.shipping.logoX}%;
-               transform: translate(-50%, -50%);
-               width: ${settings.shipping.logoSize}mm;
-               opacity: ${settings.shipping.logoOpacity / 100};
-               --opacity: ${settings.shipping.logoOpacity / 100};
-               pointer-events: none;
-               z-index: 1;
-             ">
-      ` : ''}
-      
-      <!-- 物流單內容 - 加入排版調整 -->
-      <div style="
-        z-index: 2;
+  // 修改 generateShippingPage 函數
+  function generateShippingPage(data, settings, customOrderNo) {
+    if (!data) return '';
+    
+    const displayOrderNo = customOrderNo || data.orderNo;
+    
+    // 取得當前的超商類型（從儲存的資料或自動偵測）
+    const provider = data.provider || detectProviderFromHTML(data.html) || 'default';
+    
+    // 使用當前超商的設定，如果沒有則使用即時設定
+    const layoutSettings = settings.shipping.currentProviderSettings || 
+                          settings.shipping.providerSettings?.[provider] || {
+      scale: 100,
+      offsetX: 0,
+      offsetY: 0,
+      padding: 0
+    };
+    
+    return `
+      <div class="bv-shipping-content" style="
+        width: 100mm;
+        height: 150mm;
         position: relative;
-        transform: scale(${layoutSettings.scale / 100}) translate(${layoutSettings.offsetX}mm, ${layoutSettings.offsetY}mm);
-        transform-origin: center center;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        overflow: hidden;
+        background: white;
+        margin: 0;
+        padding: ${layoutSettings.padding}mm;
+        box-sizing: border-box;
       ">
-        <div class="bv-shipping-wrapper-inner">
-          ${data.html}
-        </div>
-      </div>
-      
-      <!-- 訂單編號標籤（最上層） -->
-      ${settings.showOrderNumber && displayOrderNo ? `
+        <!-- 底圖（最底層） -->
+        ${settings.shipping.logo ? `
+          <img src="${settings.shipping.logo}" 
+               class="bv-watermark-logo"
+               style="
+                 position: absolute;
+                 top: ${settings.shipping.logoY}%;
+                 left: ${settings.shipping.logoX}%;
+                 transform: translate(-50%, -50%);
+                 width: ${settings.shipping.logoSize}mm;
+                 opacity: ${settings.shipping.logoOpacity / 100};
+                 --opacity: ${settings.shipping.logoOpacity / 100};
+                 pointer-events: none;
+                 z-index: 1;
+               ">
+        ` : ''}
+        
+        <!-- 物流單內容 - 加入排版調整 -->
         <div style="
-          position: absolute;
-          top: ${settings.orderLabelTop}mm;
-          left: 50%;
-          transform: translateX(-50%);
-          background: white;
-          padding: 4px 12px;
-          border: 1px solid #333;
-          border-radius: 4px;
-          font-size: ${settings.orderLabelSize}px;
-          font-weight: bold;
-          z-index: 1000;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          white-space: nowrap;
+          z-index: 2;
+          position: relative;
+          transform: scale(${layoutSettings.scale / 100}) translate(${layoutSettings.offsetX}mm, ${layoutSettings.offsetY}mm);
+          transform-origin: center center;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         ">
-          訂單編號：${displayOrderNo}
+          <div class="bv-shipping-wrapper-inner">
+            ${data.html}
+          </div>
         </div>
-      ` : ''}
-    </div>
-  `;
-}
-// 在初始化時載入所有超商的設定
-function loadAllProviderSettings() {
-  ['default', 'seven', 'family', 'hilife', 'okmart'].forEach(provider => {
-    if (chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get([`bvProviderSettings_${provider}`], (result) => {
-        if (result[`bvProviderSettings_${provider}`]) {
-          cachedProviderSettings[provider] = result[`bvProviderSettings_${provider}`];
-        }
-      });
-    }
-  });
-}
+        
+        <!-- 訂單編號標籤（最上層） -->
+        ${settings.showOrderNumber && displayOrderNo ? `
+          <div style="
+            position: absolute;
+            top: ${settings.orderLabelTop}mm;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 4px 12px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: ${settings.orderLabelSize}px;
+            font-weight: bold;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            white-space: nowrap;
+          ">
+            訂單編號：${displayOrderNo}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+  
+  // 在初始化時載入所有超商的設定
+  function loadAllProviderSettings() {
+    ['default', 'seven', 'family', 'hilife', 'okmart'].forEach(provider => {
+      if (chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get([`bvProviderSettings_${provider}`], (result) => {
+          if (result[`bvProviderSettings_${provider}`]) {
+            cachedProviderSettings[provider] = result[`bvProviderSettings_${provider}`];
+          }
+        });
+      }
+    });
+  }
   
   // 新增：從 HTML 內容偵測超商類型
   function detectProviderFromHTML(html) {
