@@ -110,35 +110,54 @@
   function injectShippingPanel() {
     if (document.getElementById('bv-shipping-panel')) return;
     
-    // 創建一個浮動按鈕
-    const floatBtn = document.createElement('div');
-    floatBtn.id = 'bv-shipping-panel';
-    floatBtn.style.cssText = `
+    // 創建一個更明顯的控制面板
+    const panel = document.createElement('div');
+    panel.id = 'bv-shipping-panel';
+    panel.style.cssText = `
       position: fixed !important;
-      bottom: 30px !important;
-      right: 30px !important;
-      width: 60px !important;
-      height: 60px !important;
-      background: #5865F2 !important;
-      border-radius: 50% !important;
-      box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4) !important;
-      cursor: pointer !important;
+      top: 10px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      background: white !important;
+      border: 3px solid #5865F2 !important;
+      border-radius: 8px !important;
+      padding: 10px 20px !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
       z-index: 2147483647 !important;
       display: flex !important;
       align-items: center !important;
-      justify-content: center !important;
-      color: white !important;
-      font-size: 24px !important;
-      font-weight: bold !important;
+      gap: 15px !important;
     `;
     
-    floatBtn.innerHTML = '<span id="bv-count">0</span>';
-    floatBtn.title = '點擊抓取物流單';
+    panel.innerHTML = `
+      <span style="font-weight: bold; color: #333;">BV 出貨助手</span>
+      <span id="bv-count" style="
+        background: #5865F2;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-weight: bold;
+      ">0</span>
+      <button id="bv-fetch-btn" style="
+        background: #5865F2;
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s;
+      "
+      onmouseover="this.style.background='#4752c4'"
+      onmouseout="this.style.background='#5865F2'">
+        抓取物流單
+      </button>
+    `;
     
-    document.body.appendChild(floatBtn);
+    document.body.appendChild(panel);
     
-    // 點擊事件
-    floatBtn.addEventListener('click', fetchShippingData);
+    // 事件監聽
+    document.getElementById('bv-fetch-btn').addEventListener('click', fetchShippingData);
     
     // 更新狀態
     updateShippingPanelStatus();
@@ -447,14 +466,15 @@
     // 嘉里大榮會在 convertKTJToImages 函數內部呼叫 saveShippingData
   }
 
-  // 簡化版：將 PDF 轉換為圖片
+  // 修改 convertKTJToImages 函數
   async function convertKTJToImages() {
     const btn = document.getElementById('bv-fetch-btn');
     
     try {
       btn.innerHTML = '正在轉換 PDF...';
+      btn.disabled = true;
       
-      // 1. 載入 PDF.js（使用 CDN）
+      // 1. 載入 PDF.js
       if (!window.pdfjsLib) {
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -468,22 +488,33 @@
           'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       }
       
-      // 2. 獲取 PDF
+      // 2. 獲取 PDF - 使用當前頁面 URL
       const response = await fetch(window.location.href, {
-        credentials: 'same-origin'
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'application/pdf'
+        }
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const pdfData = await response.arrayBuffer();
       
       // 3. 載入 PDF 文件
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       console.log(`PDF 共有 ${pdf.numPages} 頁`);
       
+      // 清空之前的資料
+      shippingData = [];
+      
       // 4. 將每一頁轉換為圖片
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
         
         // 使用固定的縮放比例，確保清晰度
-        const scale = 2; // 2x 解析度，確保列印清晰
+        const scale = 2; // 2x 解析度
         const viewport = page.getViewport({ scale });
         
         // 創建 canvas
@@ -501,7 +532,7 @@
         // 轉換為圖片 data URL
         const imgDataUrl = canvas.toDataURL('image/png', 0.95);
         
-        // 創建包裝，保持原始尺寸比例
+        // 創建包裝
         const wrapper = document.createElement('div');
         wrapper.className = 'bv-shipping-wrapper';
         wrapper.style.cssText = `
@@ -519,10 +550,10 @@
                       display: block;">
         `;
         
-        // 簡單的訂單編號（從 URL 參數提取）
+        // 從 URL 參數提取訂單編號
         const urlParams = new URLSearchParams(window.location.search);
         const ids = urlParams.get('ids')?.split(',') || [];
-        const orderNo = ids[pageNum - 1] || `KTJ-${pageNum}`;
+        const orderNo = ids[pageNum - 1] || `KTJ-${Date.now()}-${pageNum}`;
         
         shippingData.push({
           html: wrapper.outerHTML,
@@ -546,8 +577,13 @@
       
     } catch (error) {
       console.error('轉換嘉里大榮 PDF 時發生錯誤:', error);
+      btn.innerHTML = '抓取失敗，重試';
+      btn.disabled = false;
       
-      // 如果轉換失敗，提供簡單的提示
+      // 顯示錯誤訊息
+      showNotification(`錯誤: ${error.message}`, 'error');
+      
+      // 使用備用方案
       createKTJPlaceholder();
     }
   }
