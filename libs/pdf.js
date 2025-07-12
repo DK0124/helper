@@ -29,7 +29,7 @@
 		exports["pdfjs-dist/build/pdf"] = root.pdfjsLib = factory();
 	else
 		root["pdfjs-dist/build/pdf"] = root.pdfjsLib = factory();
-})(globalThis, () => {
+})(window, () => {
 return /******/ (() => { // webpackBootstrap
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ([
