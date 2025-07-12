@@ -1,72 +1,126 @@
-// BV SHOP 出貨助手 - 內容腳本 (完整版 - 支援物流編號比對與排版調整)
+// BV SHOP 出貨助手 - 嘉里大榮自動抓取專用（自動、無面板、有通知）
 (function() {
   'use strict';
-  
-  console.log('BV SHOP 出貨助手已載入');
-  
-  // 全域變數（提前定義）
-  let currentPage = detectCurrentPage();
-  let shippingData = [];
-  let detailData = [];
-  let savedLogos = { shipping: null, detail: null };
-  let panelActive = false;
-  let cachedProviderSettings = {};
-  
-  // 立即通知 background script
-  if (chrome.runtime && chrome.runtime.sendMessage) {
-    try {
-      chrome.runtime.sendMessage({ action: 'contentScriptReady' });
-    } catch (e) {
-      console.log('無法連接到 background script:', e.message);
-    }
-  }
-  
-  // 設定訊息監聽器（在全域變數定義之後）
-  if (chrome.runtime && chrome.runtime.onMessage) {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      console.log('收到訊息:', request.action);
-      
-      // 回應 ping
-      if (request.action === 'ping') {
-        sendResponse({ status: 'pong' });
-        return true;
-      }
-      
-      // 處理切換面板
-      if (request.action === 'togglePanel') {
-        try {
-          if (currentPage.type === 'detail') {
-            if (panelActive) {
-              deactivateDetailPanel();
-            } else {
-              activateDetailPanel();
-            }
-            sendResponse({ status: 'success' });
-          } else if (currentPage.type === 'shipping') {
-            // 物流單頁面不需要切換，但回應成功
-            sendResponse({ status: 'success', message: 'Shipping page panel is always visible' });
-          } else {
-            sendResponse({ status: 'error', message: 'Unsupported page type' });
-          }
-        } catch (error) {
-          console.error('處理訊息時發生錯誤:', error);
-          sendResponse({ status: 'error', message: error.message });
-        }
-        return true;
-      }
-      
-      // 未知的 action
-      sendResponse({ status: 'unknown action' });
-      return true;
-    });
-  }
 
-  // 偵測當前頁面類型
+  // 檢查是不是嘉里大榮物流單頁
   function detectCurrentPage() {
     const hostname = window.location.hostname;
     const pathname = window.location.pathname;
-    
-    console.log('偵測頁面 - hostname:', hostname, 'pathname:', pathname);
+    if (hostname.includes('bvshop-manage.bvshop.tw') && pathname.includes('order_multi_print_ktj_logistics')) {
+      return true;
+    }
+    return false;
+  }
+
+  // 顯示通知（優先用 alert，避免被蓋掉）
+  function showNotification(msg, type='info') {
+    alert(`[BV SHOP 出貨助手] ${msg}`);
+  }
+
+  // 主要自動抓 PDF → 圖片 → 存儲
+  async function autoGrabKTJShipping() {
+    try {
+      showNotification('開始自動抓取嘉里大榮物流單...');
+      // 1. 載入 PDF.js
+      if (!window.pdfjsLib) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
+      // 2. 取得 PDF 檔
+      let pdfUrl = window.location.href;
+      // 有些系統可能會用 embed 或 iframe 載 pdf，可再做進階判斷
+      const embed = document.querySelector('embed[type="application/pdf"]');
+      if (embed && embed.src) pdfUrl = embed.src;
+      const object = document.querySelector('object[type="application/pdf"]');
+      if (object && object.data) pdfUrl = object.data;
+
+      const response = await fetch(pdfUrl, {credentials: 'same-origin'});
+      if (!response.ok) throw new Error('取得 PDF 失敗');
+      const pdfData = await response.arrayBuffer();
+
+      // 3. 解析 PDF
+      const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+      let shippingData = [];
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const scale = 2;
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        const imgDataUrl = canvas.toDataURL('image/png', 0.95);
+
+        // 提取訂單編號
+        const urlParams = new URLSearchParams(window.location.search);
+        const ids = urlParams.get('ids')?.split(',') || [];
+        const orderNo = ids[pageNum - 1] || `KTJ-${pageNum}`;
+
+        shippingData.push({
+          html: `<div class="bv-shipping-wrapper" style="width: 100%; max-width: 105mm; margin: 0 auto; background: white; position: relative;">
+                  <img src="${imgDataUrl}" style="width: 100%; height: auto; display: block;">
+                </div>`,
+          orderNo,
+          serviceCode: `KTJ${orderNo}`,
+          width: '105mm',
+          height: '148mm',
+          index: pageNum - 1,
+          provider: 'ktj',
+          isImage: true
+        });
+      }
+
+      // 4. 存到 chrome.storage.local
+      await new Promise((res, rej) => {
+        chrome.storage.local.set({
+          bvShippingData: shippingData,
+          lastProvider: 'ktj',
+          timestamp: Date.now()
+        }, () => {
+          if (chrome.runtime.lastError) return rej(chrome.runtime.lastError);
+          res();
+        });
+      });
+
+      showNotification(`已自動抓取 ${shippingData.length} 張嘉里大榮物流單！請切到出貨明細頁合併列印`);
+    } catch (err) {
+      showNotification('自動抓取失敗：' + err.message, 'error');
+    }
+  }
+
+  // 當進入目標頁面自動觸發
+  if (detectCurrentPage()) {
+    autoGrabKTJShipping();
+  }
+
+  // 教你怎麼用 console 檢查有沒有抓到
+  window.bvCheckKTJ = function() {
+    chrome.storage.local.get(['bvShippingData'], (result) => {
+      if (!result.bvShippingData) {
+        alert('尚未抓到任何物流單');
+      } else {
+        alert(`目前已抓到 ${result.bvShippingData.length} 張物流單`);
+        // 你也可以在 console 輸出詳細資料
+        console.log(result.bvShippingData);
+      }
+    });
+  };
+
+  // 教學提示
+  if (detectCurrentPage()) {
+    setTimeout(() => {
+      console.log('%c[教學] 檢查有沒有抓到物流單，請在 Console 輸入：', 'color: #5865F2; font-weight:bold;');
+      console.log('%cbvCheckKTJ()', 'color: green; font-weight:bold;');
+    }, 2000);
+  }
+})();
     
     // 7-11 物流單頁面
     if (hostname.includes('myship.7-11.com.tw') || 
