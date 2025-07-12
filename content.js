@@ -21,17 +21,15 @@
   async function autoGrabKTJShipping() {
     try {
       showNotification('開始自動抓取嘉里大榮物流單...');
-      // 載入 PDF.js
-      if (!window.pdfjsLib) {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-        await new Promise((resolve, reject) => {
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      }
+      // 載入 pdf.js
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL('libs/pdf.js');
+      script.onload = function() {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('libs/pdf.worker.js');
+        // 你的自動抓取流程
+        autoGrabKTJShipping();
+      };
+      document.head.appendChild(script);
 
       // 取得 PDF 檔案
       let pdfUrl = window.location.href;
