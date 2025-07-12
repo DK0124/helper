@@ -1,50 +1,29 @@
 {
   "manifest_version": 3,
   "name": "BV SHOP 出貨助手",
-  "description": "自動整合物流單與出貨明細，支援自訂格式與批次列印",
-  "version": "2.3.0",
+  "version": "1.0.0",
+  "description": "自動抓取嘉里大榮物流單並支援合併列印",
   "author": "DK0124",
-  "icons": {
-    "16": "icons/icon-16.png",
-    "48": "icons/icon-48.png",
-    "128": "icons/icon-128.png"
-  },
+  
   "permissions": [
-    "activeTab",
-    "storage"
+    "storage",
+    "activeTab"
   ],
+  
   "host_permissions": [
-    "*://*.7-11.com.tw/*",
-    "*://*.logistics.ecpay.com.tw/*",
-    "*://*.logistic.paynow.com.tw/*",
-    "*://*.family.com.tw/*",
-    "*://*.famiport.com.tw/*",
-    "*://*.hilife.com.tw/*",
-    "*://*.okmart.com.tw/*",
-    "*://*.bvshop.tw/*",
-    "*://bvshop-manage.bvshop.tw/*"
+    "https://bvshop-manage.bvshop.tw/*"
   ],
-  "background": {
-    "service_worker": "background.js"
-  },
+  
   "content_scripts": [
     {
       "matches": [
-        "*://*.7-11.com.tw/*",
-        "*://*.logistics.ecpay.com.tw/*",
-        "*://*.logistic.paynow.com.tw/*",
-        "*://*.family.com.tw/*",
-        "*://*.famiport.com.tw/*",
-        "*://*.hilife.com.tw/*",
-        "*://*.okmart.com.tw/*",
-        "*://*.bvshop.tw/*",
-        "*://bvshop-manage.bvshop.tw/*"
+        "https://bvshop-manage.bvshop.tw/*"
       ],
       "js": ["content.js"],
-      "css": ["content.css"],
-      "run_at": "document_idle"
+      "run_at": "document_end"
     }
   ],
+  
   "web_accessible_resources": [
     {
       "resources": [
@@ -54,12 +33,10 @@
       "matches": ["<all_urls>"]
     }
   ],
-  "action": {
-    "default_icon": {
-      "16": "icons/icon-16.png",
-      "48": "icons/icon-48.png",
-      "128": "icons/icon-128.png"
-    },
-    "default_title": "BV SHOP 出貨助手"
+  
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
   }
 }
