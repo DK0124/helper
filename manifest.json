@@ -24,15 +24,6 @@
     "*://*.bvshop.tw/*",
     "*://bvshop-manage.bvshop.tw/*"
   ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "libs/pdf.js",
-        "libs/pdf.worker.js"
-      ],
-      "matches": [ "<all_urls>" ]
-    }
-  ]
   "background": {
     "service_worker": "background.js"
   },
@@ -52,6 +43,15 @@
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "libs/pdf.js",
+        "libs/pdf.worker.js"
+      ],
+      "matches": ["<all_urls>"]
     }
   ],
   "action": {
