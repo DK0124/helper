@@ -1,213 +1,181 @@
-// BV SHOP 出貨助手 - 使用 Blob 和 Canvas API
-(function() {
-  'use strict';
+// 在原本的 content.js 最後加入這些功能
 
-  function isKTJPage() {
-    return location.pathname.includes('order_multi_print_ktj_logistics');
-  }
-
-  function notify(msg) {
-    alert(`[BV SHOP 出貨助手] ${msg}`);
-  }
-
-  // 方案：將 PDF 轉為圖片（使用內建 API）
-  async function convertPDFToImage() {
-    try {
-      const urlParams = new URLSearchParams(location.search);
-      const orderIds = urlParams.get('ids')?.split(',') || [];
-      
-      notify(`開始處理 ${orderIds.length} 張物流單...`);
-
-      // 找到 PDF 元素
-      const pdfElement = document.querySelector('embed, object, iframe');
-      let pdfUrl = location.href;
-      
-      if (pdfElement) {
-        pdfUrl = pdfElement.src || pdfElement.data || pdfUrl;
-      }
-
-      console.log('PDF URL:', pdfUrl);
-
-      // 方案 A: 使用 Canvas 截取可見區域
-      const captureVisibleArea = async () => {
-        // 創建 canvas
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // 設定尺寸（A6 = 105mm x 148mm，以 96 DPI 計算）
-        const scale = 2; // 2x 解析度
-        canvas.width = 396 * scale;  // 105mm
-        canvas.height = 559 * scale; // 148mm
-        
-        // 白色背景
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 如果有 PDF 元素，嘗試取得其內容
-        if (pdfElement && pdfElement.contentDocument) {
-          try {
-            // 嘗試存取 iframe 內容
-            const pdfDoc = pdfElement.contentDocument;
-            const pdfCanvas = pdfDoc.querySelector('canvas');
-            if (pdfCanvas) {
-              ctx.drawImage(pdfCanvas, 0, 0, canvas.width, canvas.height);
-            }
-          } catch (e) {
-            console.log('無法存取 PDF 內容，使用替代方案');
-          }
-        }
-        
-        // 加上文字標記
-        ctx.fillStyle = '#333';
-        ctx.font = '24px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('嘉里大榮物流單', canvas.width / 2, 50);
-        
-        orderIds.forEach((id, i) => {
-          ctx.fillText(`訂單: ${id}`, canvas.width / 2, 100 + (i * 30));
-        });
-        
-        return canvas.toDataURL('image/png');
-      };
-
-      // 方案 B: 創建包含 PDF 連結的 HTML
-      const createPDFLink = () => {
-        return `<div style="border:2px solid #333;padding:20px;text-align:center;">
-                  <h3>嘉里大榮物流單</h3>
-                  <p>訂單編號: ${orderIds.join(', ')}</p>
-                  <a href="${pdfUrl}" target="_blank" style="display:inline-block;margin:10px;padding:10px 20px;background:#007bff;color:white;text-decoration:none;border-radius:5px;">
-                    開啟 PDF
-                  </a>
-                  <p style="color:#666;font-size:12px;">請點擊上方按鈕開啟並列印</p>
-                </div>`;
-      };
-
-      // 嘗試截圖，如果失敗則使用連結
-      let imageData;
-      try {
-        imageData = await captureVisibleArea();
-      } catch (e) {
-        console.log('截圖失敗，使用連結方案');
-        imageData = null;
-      }
-
-      // 建立物流單資料
-      const shippingData = orderIds.map((orderId, index) => ({
-        html: imageData 
-          ? `<div class="bv-shipping-wrapper" style="width:100%;max-width:105mm;margin:0 auto;">
-              <img src="${imageData}" style="width:100%;display:block;">
-             </div>`
-          : `<div class="bv-shipping-wrapper" style="width:100%;max-width:105mm;margin:0 auto;">
-              ${createPDFLink()}
-             </div>`,
-        orderNo: orderId,
-        serviceCode: `KTJ${orderId}`,
-        width: '105mm',
-        height: '148mm',
-        index: index,
-        provider: 'ktj',
-        isImage: !!imageData,
-        pdfUrl: pdfUrl
-      }));
-
-      // 儲存
-      await chrome.storage.local.set({
-        bvShippingData: shippingData,
-        lastProvider: 'ktj',
-        timestamp: Date.now(),
-        pdfUrl: pdfUrl
-      });
-
-      notify(`成功！已處理 ${shippingData.length} 張物流單`);
-      console.log('儲存的資料:', shippingData);
-
-    } catch (err) {
-      console.error('處理失敗:', err);
-      notify(`失敗: ${err.message}`);
+// 顯示儲存的物流單（新功能）
+window.bvShowKTJ = function() {
+  chrome.storage.local.get(['bvShippingData', 'timestamp'], (result) => {
+    if (!result.bvShippingData || result.bvShippingData.length === 0) {
+      alert('沒有找到物流單資料');
+      return;
     }
-  }
 
-  // 方案 C: 使用 Chrome Extension API 發送訊息到背景腳本
-  async function requestScreenshot() {
-    try {
-      const urlParams = new URLSearchParams(location.search);
-      const orderIds = urlParams.get('ids')?.split(',') || [];
-      
-      // 發送訊息給背景腳本
-      chrome.runtime.sendMessage({
-        action: 'captureTab',
-        orderIds: orderIds
-      }, (response) => {
-        if (response && response.success) {
-          notify(`成功！已抓取 ${orderIds.length} 張物流單`);
-        } else {
-          notify('截圖失敗，請重試');
-        }
-      });
-      
-    } catch (err) {
-      console.error('發送訊息失敗:', err);
-      // 改用其他方案
-      convertPDFToImage();
-    }
-  }
+    // 創建顯示視窗
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 99999;
+      overflow: auto;
+      padding: 20px;
+    `;
 
-  // Console 指令
-  window.bvCheckKTJ = function() {
-    chrome.storage.local.get(['bvShippingData', 'timestamp', 'pdfUrl'], (result) => {
-      const count = result.bvShippingData?.length || 0;
-      if (count === 0) {
-        alert('尚未抓取任何物流單');
-      } else {
-        const time = new Date(result.timestamp).toLocaleString();
-        alert(`已抓取 ${count} 張物流單\n時間: ${time}\nPDF: ${result.pdfUrl || '無'}`);
-        console.log('物流單資料:', result.bvShippingData);
-      }
-    });
-  };
+    const content = document.createElement('div');
+    content.style.cssText = `
+      background: white;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      border-radius: 10px;
+    `;
 
-  window.bvClearKTJ = function() {
-    if (confirm('確定要清除所有資料？')) {
-      chrome.storage.local.clear(() => {
-        alert('已清除所有資料');
-      });
-    }
-  };
-
-  window.bvRetryKTJ = function() {
-    if (isKTJPage()) {
-      convertPDFToImage();
-    } else {
-      alert('請在嘉里大榮物流單頁面使用');
-    }
-  };
-
-  // 開啟原始 PDF
-  window.bvOpenPDF = function() {
-    chrome.storage.local.get(['pdfUrl'], (result) => {
-      if (result.pdfUrl) {
-        window.open(result.pdfUrl, '_blank');
-      } else {
-        alert('找不到 PDF 連結');
-      }
-    });
-  };
-
-  // 主程式
-  if (isKTJPage()) {
-    console.log('%c=== BV SHOP 出貨助手 ===', 'color: blue; font-weight: bold; font-size: 16px;');
-    console.log('偵測到嘉里大榮物流單頁面');
-    console.log('可用指令:');
-    console.log('  bvCheckKTJ() - 檢查已抓取的物流單');
-    console.log('  bvClearKTJ() - 清除所有資料');
-    console.log('  bvRetryKTJ() - 重新抓取');
-    console.log('  bvOpenPDF()  - 開啟原始 PDF');
+    const time = result.timestamp ? new Date(result.timestamp).toLocaleString() : '未知';
     
-    // 延遲執行
-    setTimeout(() => {
-      console.log('開始處理物流單...');
-      convertPDFToImage();
-    }, 2000);
-  }
+    content.innerHTML = `
+      <h2>BV SHOP 出貨助手 - 已抓取的物流單</h2>
+      <p>抓取時間: ${time}</p>
+      <p>數量: ${result.bvShippingData.length} 張</p>
+      <hr>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 20px 0;">
+        ${result.bvShippingData.map((item, index) => `
+          <div style="border: 1px solid #ddd; padding: 10px; text-align: center;">
+            <h4>物流單 ${index + 1}</h4>
+            <p>訂單: ${item.orderNo}</p>
+            <p>代碼: ${item.serviceCode}</p>
+            ${item.isImage ? '<span style="color:green">✓ 已截圖</span>' : '<span style="color:orange">⚠ 連結</span>'}
+          </div>
+        `).join('')}
+      </div>
+      <hr>
+      <button onclick="this.parentElement.parentElement.remove()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">關閉</button>
+      <button onclick="bvExportKTJ()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">匯出資料</button>
+    `;
 
-})();
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+    
+    // 點擊背景關閉
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+  });
+};
+
+// 匯出資料功能
+window.bvExportKTJ = function() {
+  chrome.storage.local.get(['bvShippingData', 'timestamp', 'pdfUrl'], (result) => {
+    if (!result.bvShippingData) {
+      alert('沒有資料可匯出');
+      return;
+    }
+
+    // 創建 HTML 檔案
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>嘉里大榮物流單 - ${new Date().toLocaleDateString()}</title>
+  <style>
+    @media print {
+      .no-print { display: none; }
+      .page-break { page-break-after: always; }
+    }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .shipping-label { 
+      width: 105mm; 
+      margin: 0 auto 20px; 
+      border: 1px solid #ddd; 
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <h1>嘉里大榮物流單</h1>
+    <p>抓取時間: ${new Date(result.timestamp).toLocaleString()}</p>
+    <p>共 ${result.bvShippingData.length} 張</p>
+    ${result.pdfUrl ? `<p>原始 PDF: <a href="${result.pdfUrl}" target="_blank">${result.pdfUrl}</a></p>` : ''}
+    <hr>
+    <button onclick="window.print()">列印</button>
+    <hr>
+  </div>
+  
+  ${result.bvShippingData.map((item, index) => `
+    <div class="shipping-label ${index < result.bvShippingData.length - 1 ? 'page-break' : ''}">
+      ${item.html}
+    </div>
+  `).join('')}
+</body>
+</html>`;
+
+    // 下載檔案
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `KTJ_物流單_${new Date().getTime()}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    alert('已匯出 HTML 檔案，可以開啟並列印');
+  });
+};
+
+// 列印功能
+window.bvPrintKTJ = function() {
+  chrome.storage.local.get(['bvShippingData'], (result) => {
+    if (!result.bvShippingData || result.bvShippingData.length === 0) {
+      alert('沒有物流單可列印');
+      return;
+    }
+
+    // 開啟新視窗列印
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>列印物流單</title>
+  <style>
+    @media print {
+      .page-break { page-break-after: always; }
+    }
+    body { margin: 0; padding: 0; }
+    .shipping-label { 
+      width: 105mm; 
+      height: 148mm;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+  ${result.bvShippingData.map((item, index) => `
+    <div class="shipping-label ${index < result.bvShippingData.length - 1 ? 'page-break' : ''}">
+      ${item.html}
+    </div>
+  `).join('')}
+</body>
+</html>`);
+    
+    printWindow.document.close();
+    printWindow.onload = function() {
+      printWindow.print();
+    };
+  });
+};
+
+// 更新說明
+if (isKTJPage()) {
+  console.log('%c=== BV SHOP 出貨助手 ===', 'color: blue; font-weight: bold; font-size: 16px;');
+  console.log('可用指令:');
+  console.log('%c  bvCheckKTJ()  - 快速檢查', 'color: green;');
+  console.log('%c  bvShowKTJ()   - 視覺化顯示（新）', 'color: green;');
+  console.log('%c  bvExportKTJ() - 匯出 HTML 檔案（新）', 'color: green;');
+  console.log('%c  bvPrintKTJ()  - 直接列印（新）', 'color: green;');
+  console.log('%c  bvClearKTJ()  - 清除資料', 'color: orange;');
+  console.log('%c  bvOpenPDF()   - 開啟原始 PDF', 'color: blue;');
+}
