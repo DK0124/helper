@@ -3071,7 +3071,6 @@ function matchKerryOrderNumbers() {
       }
     }
   }
-  } else if (currentPage.type === 'detail') {
     // 明細頁也自動啟動
     console.log('BV SHOP 出貨明細頁面已偵測，自動啟動助手');
     
