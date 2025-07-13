@@ -1371,49 +1371,81 @@
       }
     }
     
-    // 載入 PDF.js 庫 - 修正版本
+    // 載入 PDF.js 庫 - 使用動態 import
     async function loadPdfJsLibrary() {
-      return new Promise((resolve, reject) => {
-        // 檢查是否已載入
-        if (window.pdfjsLib || window.pdfjsDistBuildPdf) {
-          pdfjsLib = window.pdfjsLib || window.pdfjsDistBuildPdf || window.pdfjsDist?.build?.pdf;
-          if (pdfjsLib) {
-            resolve();
-            return;
-          }
+      try {
+        // 如果已經載入過
+        if (pdfjsLib) {
+          return;
         }
         
-        // 創建 script 標籤載入 PDF.js
-        const script = document.createElement('script');
-        script.src = chrome.runtime.getURL('pdf.min.js');
-        
-        script.onload = () => {
-          // 嘗試多種方式取得 pdfjsLib
-          const possiblePdfjsLib = window.pdfjsLib || 
-                                  window.pdfjsDistBuildPdf || 
-                                  window.pdfjsDist?.build?.pdf ||
-                                  window['pdfjs-dist/build/pdf'];
+        // 嘗試使用動態 import
+        if (typeof import === 'function') {
+          const pdfModule = await import(chrome.runtime.getURL('pdf.min.js'));
+          pdfjsLib = pdfModule.default || pdfModule.pdfjsLib || pdfModule;
           
-          if (possiblePdfjsLib) {
-            pdfjsLib = possiblePdfjsLib;
-            // 設定 worker
-            if (pdfjsLib.GlobalWorkerOptions) {
-              pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.js');
-            }
-            console.log('PDF.js 載入成功');
-            resolve();
-          } else {
-            // 如果還是找不到，列出 window 物件來偵錯
-            console.log('可用的全域變數:', Object.keys(window).filter(key => key.includes('pdf')));
-            reject(new Error('無法找到 PDF.js 庫'));
+          if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.js');
           }
+          
+          console.log('PDF.js 透過 import 載入成功');
+          return;
+        }
+        
+        // 如果不支援動態 import，使用傳統方式
+        return loadPdfJsLegacy();
+      } catch (error) {
+        console.error('動態 import 失敗，嘗試傳統載入方式:', error);
+        return loadPdfJsLegacy();
+      }
+    }
+    
+    // 傳統載入方式
+    async function loadPdfJsLegacy() {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        
+        // 先創建一個全域回調來接收 PDF.js
+        window.__pdfjs_callback = function(lib) {
+          pdfjsLib = lib;
+          if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.js');
+          }
+          delete window.__pdfjs_callback;
+          resolve();
         };
         
-        script.onerror = () => {
-          reject(new Error('無法載入 PDF.js 檔案'));
-        };
+        // 包裝 PDF.js 載入
+        script.textContent = `
+          (function() {
+            const originalDefine = window.define;
+            window.define = undefined; // 暫時停用 AMD
+            
+            const script = document.createElement('script');
+            script.src = '${chrome.runtime.getURL('pdf.min.js')}';
+            script.onload = function() {
+              // 還原 define
+              window.define = originalDefine;
+              
+              // 傳遞 pdfjsLib
+              const lib = window.pdfjsLib || window.pdfjsDistBuildPdf || window.pdfjsDist?.build?.pdf;
+              if (lib && window.__pdfjs_callback) {
+                window.__pdfjs_callback(lib);
+              }
+            };
+            document.head.appendChild(script);
+          })();
+        `;
         
+        script.onerror = () => reject(new Error('無法載入 PDF.js'));
         document.head.appendChild(script);
+        
+        // 設定超時
+        setTimeout(() => {
+          if (!pdfjsLib) {
+            reject(new Error('PDF.js 載入超時'));
+          }
+        }, 5000);
       });
     }
   
