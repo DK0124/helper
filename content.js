@@ -164,62 +164,56 @@
     });
   }
   
-  // 截圖嘉里大榮頁面
+  // 修改 captureKTJPages 函數以使用注入的腳本
   async function captureKTJPages(orderIds) {
     try {
-      // 準備截圖
-      const captures = [];
+      console.log('開始截圖處理');
       
-      // 方案1: 嘗試使用 html2canvas (需要注入)
-      if (typeof html2canvas !== 'undefined') {
-        console.log('使用 html2canvas 截圖');
-        const canvas = await html2canvas(document.body, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          width: window.innerWidth,
-          height: window.innerHeight
-        });
-        
-        const dataUrl = canvas.toDataURL('image/png');
-        captures.push(dataUrl);
-      } 
-      // 方案2: 使用 Chrome 截圖 API
-      else {
-        console.log('使用 Chrome API 截圖');
-        
-        // 發送訊息給 background script 進行截圖
-        const response = await chrome.runtime.sendMessage({
-          action: 'captureFullPage',
-          orderIds: orderIds
-        });
-        
-        if (response && response.captures) {
-          captures.push(...response.captures);
-        }
-      }
+      // 先注入腳本
+      await injectScript();
       
-      // 如果成功截圖
-      if (captures.length > 0) {
+      // 等待腳本載入
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 發送截圖請求到注入的腳本
+      const captureResult = await new Promise((resolve) => {
+        // 設定超時
+        const timeout = setTimeout(() => {
+          resolve({ success: false, error: 'Capture timeout' });
+        }, 10000);
+        
+        // 監聽回應
+        const messageHandler = (event) => {
+          if (event.data && event.data.type === 'BV_CAPTURE_RESULT') {
+            clearTimeout(timeout);
+            window.removeEventListener('message', messageHandler);
+            resolve(event.data);
+          }
+        };
+        
+        window.addEventListener('message', messageHandler);
+        
+        // 發送截圖請求
+        window.postMessage({ type: 'BV_CAPTURE_KTJ' }, '*');
+      });
+      
+      if (captureResult.success && captureResult.dataUrl) {
+        console.log('截圖成功');
+        
         // 為每個訂單建立物流單資料
-        const shippingData = orderIds.map((orderId, index) => {
-          // 如果有多張截圖，使用對應的，否則都用第一張
-          const imageData = captures[index] || captures[0];
-          
-          return {
-            html: `<div class="bv-shipping-wrapper" style="width:100%;height:100%;position:relative;">
-                    <img src="${imageData}" style="width:100%;height:auto;display:block;">
-                  </div>`,
-            orderNo: orderId,
-            serviceCode: `KTJ${orderId}`,
-            width: '105mm',
-            height: '148mm',
-            index: index,
-            provider: 'ktj',
-            isImage: true,
-            imageData: imageData
-          };
-        });
+        const shippingData = orderIds.map((orderId, index) => ({
+          html: `<div class="bv-shipping-wrapper" style="width:100%;height:100%;position:relative;">
+                  <img src="${captureResult.dataUrl}" style="width:100%;height:auto;display:block;">
+                </div>`,
+          orderNo: orderId,
+          serviceCode: `KTJ${orderId}`,
+          width: '105mm',
+          height: '148mm',
+          index: index,
+          provider: 'ktj',
+          isImage: true,
+          imageData: captureResult.dataUrl
+        }));
         
         // 儲存資料
         await chrome.storage.local.set({
@@ -231,13 +225,60 @@
         return true;
       }
       
-      // 如果截圖失敗，使用改進的備用方案
+      // 如果注入腳本截圖失敗，嘗試使用 Chrome API
+      console.log('注入腳本截圖失敗，嘗試 Chrome API');
+      const response = await chrome.runtime.sendMessage({
+        action: 'captureFullPage',
+        orderIds: orderIds
+      });
+      
+      if (response && response.captures && response.captures.length > 0) {
+        const shippingData = orderIds.map((orderId, index) => ({
+          html: `<div class="bv-shipping-wrapper" style="width:100%;height:100%;position:relative;">
+                  <img src="${response.captures[0]}" style="width:100%;height:auto;display:block;">
+                </div>`,
+          orderNo: orderId,
+          serviceCode: `KTJ${orderId}`,
+          width: '105mm',
+          height: '148mm',
+          index: index,
+          provider: 'ktj',
+          isImage: true,
+          imageData: response.captures[0]
+        }));
+        
+        await chrome.storage.local.set({
+          bvShippingData: shippingData,
+          lastProvider: 'ktj',
+          timestamp: Date.now()
+        });
+        
+        return true;
+      }
+      
+      // 如果都失敗，使用備用方案
       return await captureKTJFallback(orderIds);
       
     } catch (error) {
       console.error('截圖失敗:', error);
       return await captureKTJFallback(orderIds);
     }
+  }
+  
+  // 注入腳本的函數
+  async function injectScript() {
+    // 檢查是否已經注入
+    if (document.querySelector('script[data-bv-inject]')) {
+      console.log('腳本已經注入');
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('inject.js');
+    script.setAttribute('data-bv-inject', 'true');
+    (document.head || document.documentElement).appendChild(script);
+    
+    console.log('已注入腳本');
   }
   
   // 改進的備用方案
