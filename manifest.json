@@ -57,10 +57,16 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "pdf.min.js",
+        "pdf.worker.min.js",
         "pdf.min.mjs",
-        "pdf.worker.min.mjs"
+        "pdf.worker.min.mjs",
+        "pdf-loader.js"
       ],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
 }
