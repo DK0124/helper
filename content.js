@@ -4,6 +4,13 @@
   
   console.log('BV SHOP 出貨助手已載入');
   
+  // 檢查 PDF.js 是否載入
+  console.log('檢查 PDF.js 狀態:', {
+    pdfjsLib: typeof pdfjsLib !== 'undefined' ? 'exists' : 'undefined',
+    windowPdfjsLib: typeof window.pdfjsLib !== 'undefined' ? 'exists' : 'undefined',
+    pdfjsDistBuildPdf: typeof window['pdfjs-dist/build/pdf'] !== 'undefined' ? 'exists' : 'undefined'
+  });
+  
   // 全域變數（提前定義）
   let currentPage = detectCurrentPage();
   let shippingData = [];
@@ -12,7 +19,6 @@
   let panelActive = false;
   let cachedProviderSettings = {};
   let pdfShippingData = []; // 儲存從 PDF 轉換的物流單
-  let pdfjsLib = null; // PDF.js 庫實例
   
   // 立即通知 background script
   if (chrome.runtime && chrome.runtime.sendMessage) {
