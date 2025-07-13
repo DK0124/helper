@@ -2572,7 +2572,6 @@
           savePresetRow.style.display = 'flex';
         }
         if (newPresetName) {
-          newPresetName.value = presetSelect
           newPresetName.value = presetSelect.value || '';
           newPresetName.focus();
         }
