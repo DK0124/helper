@@ -24,13 +24,21 @@
   // 設定訊息監聽器（在全域變數定義之後）
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      console.log('收到訊息:', request.action);
-      
-      // 回應 ping
-      if (request.action === 'ping') {
-        sendResponse({ status: 'pong' });
-        return true;
+      switch (request.action) {
+        case 'getPageDimensions':
+          sendResponse({
+            width: document.documentElement.scrollWidth,
+            height: document.documentElement.scrollHeight
+          });
+          break;
+          
+        case 'scrollTo':
+          window.scrollTo(0, request.position);
+          sendResponse({ success: true });
+          break;
       }
+      return true;
+    });
       
       // 處理切換面板
       if (request.action === 'togglePanel') {
