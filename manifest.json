@@ -12,7 +12,8 @@
   "permissions": [
     "activeTab",
     "storage",
-    "downloads"
+    "downloads",
+    "scripting"
   ],
   "host_permissions": [
     "*://*.7-11.com.tw/*",
@@ -60,7 +61,10 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "pdf.worker.js"
+        "pdf.worker.js",
+        "kerry-panel.html",
+        "kerry-panel.js",
+        "kerry-panel.css"
       ],
       "matches": ["<all_urls>"]
     }
