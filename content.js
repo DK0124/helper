@@ -1371,75 +1371,61 @@
       }
     }
     
-    // 載入 PDF.js 庫 - 修正版本
+    // 載入 PDF.js 庫 - 使用 iframe 隔離載入
     async function loadPdfJsLibrary() {
       return new Promise((resolve, reject) => {
         // 檢查是否已載入
-        if (window.pdfjsLib) {
-          pdfjsLib = window.pdfjsLib;
+        if (window.pdfjsLib || pdfjsLib) {
+          pdfjsLib = window.pdfjsLib || pdfjsLib;
           resolve();
           return;
         }
         
-        // 創建 script 標籤載入 PDF.js
-        const script = document.createElement('script');
+        // 創建隱藏的 iframe 來載入 PDF.js
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        
+        // 在 iframe 中載入 script
+        const script = iframeDoc.createElement('script');
         script.src = chrome.runtime.getURL('pdf.js');
         
-        // 定義載入完成的處理函數
-        const checkPdfJs = () => {
-          // 檢查各種可能的位置
-          const possibleLocations = [
-            window.pdfjsLib,
-            window['pdfjs-dist/build/pdf'],
-            window.pdfjsDistBuildPdf,
-            globalThis?.pdfjsLib,
-            globalThis?.['pdfjs-dist/build/pdf']
-          ];
-          
-          for (const lib of possibleLocations) {
-            if (lib && typeof lib === 'object') {
-              pdfjsLib = lib;
-              console.log('找到 PDF.js 庫');
-              
-              // 設定 worker
-              if (pdfjsLib.GlobalWorkerOptions) {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.js');
-              }
-              
-              resolve();
-              return;
-            }
-          }
-          
-          // 如果還是找不到，可能需要等待一下
-          return false;
-        };
-        
         script.onload = () => {
-          // 立即檢查
-          if (!checkPdfJs()) {
-            // 如果沒找到，等待一下再試
-            let attempts = 0;
-            const interval = setInterval(() => {
-              attempts++;
-              if (checkPdfJs() || attempts > 10) {
-                clearInterval(interval);
-                if (!pdfjsLib && attempts > 10) {
-                  console.error('無法找到 PDF.js，可用的全域變數:', 
-                    Object.keys(window).filter(key => key.toLowerCase().includes('pdf'))
-                  );
-                  reject(new Error('無法找到 PDF.js 庫'));
-                }
-              }
-            }, 100);
+          // 從 iframe 中取得 pdfjsLib
+          const iframeWindow = iframe.contentWindow;
+          const lib = iframeWindow.pdfjsLib || 
+                       iframeWindow['pdfjs-dist/build/pdf'] ||
+                       iframeWindow.pdfjsDistBuildPdf;
+          
+          if (lib) {
+            // 複製到主 window
+            window.pdfjsLib = lib;
+            pdfjsLib = lib;
+            
+            // 設定 worker
+            if (pdfjsLib.GlobalWorkerOptions) {
+              pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.js');
+            }
+            
+            // 清理 iframe
+            document.body.removeChild(iframe);
+            
+            console.log('PDF.js 載入成功（透過 iframe）');
+            resolve();
+          } else {
+            document.body.removeChild(iframe);
+            reject(new Error('無法從 iframe 中找到 PDF.js'));
           }
         };
         
         script.onerror = () => {
+          document.body.removeChild(iframe);
           reject(new Error('無法載入 PDF.js 檔案'));
         };
         
-        document.head.appendChild(script);
+        iframeDoc.head.appendChild(script);
       });
     }
   
