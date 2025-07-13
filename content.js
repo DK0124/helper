@@ -586,6 +586,7 @@
           showNotification(`已載入 ${kerryShippingData.length} 張嘉里大榮物流單`, 'success');
         }
       });
+    }
 
   // 自動配對嘉里大榮訂單編號
   function autoMatchKerryOrders() {
