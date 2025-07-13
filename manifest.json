@@ -23,6 +23,12 @@
     "*://*.bvshop.tw/*",
     "*://bvshop-manage.bvshop.tw/*"
   ],
+  "web_accessible_resources": [
+  {
+    "resources": ["inject.js"],
+    "matches": ["<all_urls>"]
+  }
+  ],
   "background": {
     "service_worker": "background.js"
   },
