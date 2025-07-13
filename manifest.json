@@ -41,7 +41,10 @@
         "*://*.kerrytj.com/*",
         "*://kerrytj.com/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "pdf.js",
+        "content.js"
+      ],
       "css": ["content.css"],
       "run_at": "document_idle"
     }
@@ -57,13 +60,9 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "pdf.js",
         "pdf.worker.js"
       ],
       "matches": ["<all_urls>"]
     }
-  ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
-  }
+  ]
 }
