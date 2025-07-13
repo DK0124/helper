@@ -1,199 +1,140 @@
-// BV SHOP 出貨助手 - 嘉里大榮自動抓取專用（自動、無面板、有通知）
+// BV SHOP 出貨助手 - 診斷版
 (function() {
   'use strict';
 
-  // 載入狀態
-  let isPdfJsLoading = false;
-  let isPdfJsLoaded = false;
-
-  // 1. 檢查是不是嘉里大榮物流單頁
+  // 檢查是否為嘉里大榮頁面
   function isKTJPage() {
-    const hostname = window.location.hostname;
-    const pathname = window.location.pathname;
-    return (
-      hostname.includes('bvshop-manage.bvshop.tw') &&
-      pathname.includes('order_multi_print_ktj_logistics')
-    );
+    return location.hostname.includes('bvshop-manage.bvshop.tw') &&
+           location.pathname.includes('order_multi_print_ktj_logistics');
   }
 
-  // 2. 顯示通知
-  function showNotification(msg) {
+  // 顯示通知
+  function notify(msg) {
     alert(`[BV SHOP 出貨助手] ${msg}`);
   }
 
-  // 3. 載入 PDF.js（只載入一次）
-  function loadPdfJs() {
-    return new Promise((resolve, reject) => {
-      // 如果已經載入，直接返回
-      if (window.pdfjsLib) {
-        isPdfJsLoaded = true;
-        resolve();
-        return;
-      }
-
-      // 如果正在載入，等待
-      if (isPdfJsLoading) {
-        const checkInterval = setInterval(() => {
-          if (window.pdfjsLib) {
-            clearInterval(checkInterval);
-            resolve();
+  // 診斷 PDF.js 載入
+  function diagnosePdfJs() {
+    console.log('=== PDF.js 診斷開始 ===');
+    
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('libs/pdf.min.js');
+    
+    console.log('Script URL:', script.src);
+    
+    script.onload = () => {
+      console.log('Script onload 觸發');
+      
+      // 列出所有可能的位置
+      console.log('檢查 window.pdfjsLib:', typeof window.pdfjsLib);
+      console.log('檢查 window.pdfjsDistBuildPdf:', typeof window.pdfjsDistBuildPdf);
+      console.log('檢查 globalThis.pdfjsLib:', typeof globalThis.pdfjsLib);
+      
+      // 列出所有包含 pdf 的全域變數
+      const pdfKeys = Object.keys(window).filter(k => k.toLowerCase().includes('pdf'));
+      console.log('Window 上包含 "pdf" 的 keys:', pdfKeys);
+      
+      // 嘗試直接執行測試
+      setTimeout(() => {
+        console.log('=== 延遲 1 秒後再檢查 ===');
+        console.log('window.pdfjsLib:', window.pdfjsLib);
+        console.log('typeof pdfjsLib (不加 window):', typeof pdfjsLib);
+        
+        // 如果找到任何 PDF 相關物件，列出其屬性
+        pdfKeys.forEach(key => {
+          const obj = window[key];
+          if (obj && typeof obj === 'object') {
+            console.log(`${key} 的屬性:`, Object.keys(obj).slice(0, 10));
           }
-        }, 100);
-        return;
-      }
-
-      // 開始載入
-      isPdfJsLoading = true;
-      const script = document.createElement('script');
-      script.src = chrome.runtime.getURL('libs/pdf.js');
-      
-      script.onload = function() {
-        if (window.pdfjsLib) {
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('libs/pdf.worker.js');
-          isPdfJsLoaded = true;
-          isPdfJsLoading = false;
-          console.log('PDF.js 載入成功');
-          resolve();
-        } else {
-          isPdfJsLoading = false;
-          reject(new Error('PDF.js 載入後 pdfjsLib 仍未定義'));
-        }
-      };
-      
-      script.onerror = function() {
-        isPdfJsLoading = false;
-        reject(new Error('PDF.js 載入失敗'));
-      };
-      
-      document.head.appendChild(script);
-    });
-  }
-
-  // 4. 主要的 PDF 抓取函數（不再處理載入）
-  async function grabPdfContent() {
-    try {
-      // 取得 PDF 檔案
-      let pdfUrl = window.location.href;
-      const embed = document.querySelector('embed[type="application/pdf"]');
-      if (embed && embed.src) pdfUrl = embed.src;
-      const object = document.querySelector('object[type="application/pdf"]');
-      if (object && object.data) pdfUrl = object.data;
-
-      console.log('準備抓取 PDF:', pdfUrl);
-
-      const response = await fetch(pdfUrl, {credentials: 'same-origin'});
-      if (!response.ok) throw new Error(`取得 PDF 失敗: ${response.status}`);
-      const pdfData = await response.arrayBuffer();
-
-      // 使用 window.pdfjsLib
-      const pdf = await window.pdfjsLib.getDocument({ data: pdfData }).promise;
-      console.log(`PDF 共有 ${pdf.numPages} 頁`);
-      
-      let shippingData = [];
-      
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const scale = 2;
-        const viewport = page.getViewport({ scale });
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const context = canvas.getContext('2d');
-        
-        await page.render({ 
-          canvasContext: context, 
-          viewport: viewport 
-        }).promise;
-        
-        const imgDataUrl = canvas.toDataURL('image/png', 0.95);
-
-        // 訂單編號
-        const urlParams = new URLSearchParams(window.location.search);
-        const ids = urlParams.get('ids')?.split(',') || [];
-        const orderNo = ids[pageNum - 1] || `KTJ-${Date.now()}-${pageNum}`;
-
-        shippingData.push({
-          html: `<div class="bv-shipping-wrapper" style="width: 100%; max-width: 105mm; margin: 0 auto; background: white; position: relative;">
-                  <img src="${imgDataUrl}" style="width: 100%; height: auto; display: block;">
-                </div>`,
-          orderNo,
-          serviceCode: `KTJ${orderNo}`,
-          width: '105mm',
-          height: '148mm',
-          index: pageNum - 1,
-          provider: 'ktj',
-          isImage: true
         });
-        
-        console.log(`已處理第 ${pageNum}/${pdf.numPages} 頁`);
-      }
-
-      // 存到 chrome.storage.local
-      await new Promise((res, rej) => {
-        chrome.storage.local.set(
-          {
-            bvShippingData: shippingData,
-            lastProvider: 'ktj',
-            timestamp: Date.now()
-          },
-          () => {
-            if (chrome.runtime.lastError) {
-              return rej(chrome.runtime.lastError);
-            }
-            res();
-          }
-        );
-      });
-
-      showNotification(`已自動抓取 ${shippingData.length} 張嘉里大榮物流單！請切到出貨明細頁合併列印`);
-      
-    } catch (err) {
-      console.error('抓取錯誤:', err);
-      showNotification('自動抓取失敗：' + err.message);
-    }
+      }, 1000);
+    };
+    
+    script.onerror = (e) => {
+      console.error('Script 載入失敗:', e);
+      console.error('請確認檔案路徑:', chrome.runtime.getURL('libs/pdf.min.js'));
+    };
+    
+    document.head.appendChild(script);
   }
 
-  // 5. 自動抓取的入口函數
-  async function autoGrabKTJShipping() {
+  // 手動測試載入（不同方法）
+  window.testPdfLoad = async function() {
+    console.log('=== 測試 fetch 方法 ===');
     try {
-      showNotification('開始自動抓取嘉里大榮物流單...');
+      const response = await fetch(chrome.runtime.getURL('libs/pdf.min.js'));
+      console.log('Fetch 狀態:', response.status);
+      console.log('Content-Type:', response.headers.get('content-type'));
       
-      // 先載入 PDF.js
-      await loadPdfJs();
+      const text = await response.text();
+      console.log('檔案大小:', text.length, 'bytes');
+      console.log('前 200 字元:', text.substring(0, 200));
       
-      // 再執行抓取
-      await grabPdfContent();
+      // 檢查是否包含關鍵字
+      console.log('包含 pdfjsLib?', text.includes('pdfjsLib'));
+      console.log('包含 window.pdfjsLib?', text.includes('window.pdfjsLib'));
+      console.log('包含 globalThis.pdfjsLib?', text.includes('globalThis.pdfjsLib'));
       
     } catch (err) {
-      console.error('載入或抓取失敗:', err);
-      showNotification('失敗：' + err.message);
+      console.error('Fetch 失敗:', err);
     }
-  }
-
-  // 6. 檢查函數（給 Console 用）
-  window.bvCheckKTJ = function() {
-    chrome.storage.local.get(['bvShippingData'], (result) => {
-      if (!result.bvShippingData || result.bvShippingData.length === 0) {
-        alert('尚未抓到任何物流單');
-      } else {
-        alert(`目前已抓到 ${result.bvShippingData.length} 張物流單`);
-        console.log('物流單資料:', result.bvShippingData);
-      }
-    });
   };
 
-  // 7. 主程式入口
-  if (isKTJPage()) {
-    console.log('偵測到嘉里大榮物流單頁面');
+  // 嘗試不同的載入方式
+  window.tryAlternativeLoad = function() {
+    console.log('=== 嘗試替代載入方式 ===');
     
-    // 延遲一下再開始，確保頁面載入完成
+    // 方法 1: 使用 import (如果支援)
+    if (typeof import === 'function') {
+      import(chrome.runtime.getURL('libs/pdf.min.js'))
+        .then(module => {
+          console.log('Import 成功，module:', module);
+          console.log('Module keys:', Object.keys(module));
+        })
+        .catch(err => console.error('Import 失敗:', err));
+    }
+    
+    // 方法 2: XMLHttpRequest + eval
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', chrome.runtime.getURL('libs/pdf.min.js'), true);
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        console.log('XHR 載入成功，執行 eval...');
+        try {
+          // 先設定全域 this
+          (function() {
+            eval(xhr.responseText);
+          }).call(window);
+          
+          setTimeout(() => {
+            console.log('Eval 後 window.pdfjsLib:', window.pdfjsLib);
+          }, 100);
+        } catch (e) {
+          console.error('Eval 錯誤:', e);
+        }
+      }
+    };
+    xhr.send();
+  };
+
+  // 簡化的主程式
+  if (isKTJPage()) {
+    console.log('%c=== BV SHOP 出貨助手診斷模式 ===', 'color: red; font-weight: bold; font-size: 16px;');
+    console.log('偵測到嘉里大榮頁面');
+    console.log('');
+    console.log('%c請在 Console 執行以下指令進行診斷：', 'color: blue; font-weight: bold;');
+    console.log('%c1. testPdfLoad()     - 測試檔案是否存在', 'color: green');
+    console.log('%c2. tryAlternativeLoad() - 嘗試其他載入方式', 'color: green');
+    console.log('');
+    
+    // 自動開始診斷
     setTimeout(() => {
-      console.log('%c[教學] 檢查有沒有抓到物流單，請在 Console 輸入：', 'color: #5865F2; font-weight:bold;');
-      console.log('%cbvCheckKTJ()', 'color: green; font-weight:bold;');
-      
-      // 開始自動抓取
-      autoGrabKTJShipping();
+      console.log('開始自動診斷...');
+      diagnosePdfJs();
     }, 1000);
   }
+
+  // 全域診斷函數
+  window.bvDiagnose = diagnosePdfJs;
 
 })();
