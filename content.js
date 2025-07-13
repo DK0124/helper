@@ -1371,14 +1371,16 @@
       }
     }
     
-    // 載入 PDF.js 庫 - 使用外部腳本方式避免 CSP 問題
+    // 載入 PDF.js 庫 - 修正版本
     async function loadPdfJsLibrary() {
       return new Promise((resolve, reject) => {
         // 檢查是否已載入
-        if (window.pdfjsLib) {
-          pdfjsLib = window.pdfjsLib;
-          resolve();
-          return;
+        if (window.pdfjsLib || window.pdfjsDistBuildPdf) {
+          pdfjsLib = window.pdfjsLib || window.pdfjsDistBuildPdf || window.pdfjsDist?.build?.pdf;
+          if (pdfjsLib) {
+            resolve();
+            return;
+          }
         }
         
         // 創建 script 標籤載入 PDF.js
@@ -1386,18 +1388,29 @@
         script.src = chrome.runtime.getURL('pdf.min.js');
         
         script.onload = () => {
-          if (window.pdfjsLib) {
-            pdfjsLib = window.pdfjsLib;
+          // 嘗試多種方式取得 pdfjsLib
+          const possiblePdfjsLib = window.pdfjsLib || 
+                                  window.pdfjsDistBuildPdf || 
+                                  window.pdfjsDist?.build?.pdf ||
+                                  window['pdfjs-dist/build/pdf'];
+          
+          if (possiblePdfjsLib) {
+            pdfjsLib = possiblePdfjsLib;
             // 設定 worker
-            pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.js');
+            if (pdfjsLib.GlobalWorkerOptions) {
+              pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.js');
+            }
+            console.log('PDF.js 載入成功');
             resolve();
           } else {
-            reject(new Error('PDF.js 載入後無法找到 pdfjsLib'));
+            // 如果還是找不到，列出 window 物件來偵錯
+            console.log('可用的全域變數:', Object.keys(window).filter(key => key.includes('pdf')));
+            reject(new Error('無法找到 PDF.js 庫'));
           }
         };
         
         script.onerror = () => {
-          reject(new Error('無法載入 PDF.js'));
+          reject(new Error('無法載入 PDF.js 檔案'));
         };
         
         document.head.appendChild(script);
