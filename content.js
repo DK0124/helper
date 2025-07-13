@@ -556,20 +556,73 @@
   function checkAndShowKerryTip() {
     // 檢查是否已經有嘉里大榮的 PDF 資料
     if (chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(['bvPdfShippingData', 'kerryTipShown'], (result) => {
-        // 如果沒有 PDF 資料且未顯示過提示
-        if ((!result.bvPdfShippingData || result.bvPdfShippingData.length === 0) && !result.kerryTipShown) {
-          // 延遲一點顯示，避免跟其他提示重疊
-          setTimeout(() => {
-            showNotification('嘉里大榮物流單：可直接上傳 PDF 檔案，系統會自動轉換並整合列印', 'info');
-            // 記錄已顯示過提示
-            chrome.storage.local.set({ kerryTipShown: true });
-          }, 2000);
+      chrome.storage.local.get(['kerryProcessedPages'], (result) => {
+        if (result.kerryProcessedPages && result.kerryProcessedPages.length > 0) {
+          // 轉換為物流單格式
+          const kerryShippingData = result.kerryProcessedPages.map((page, index) => ({
+            html: `<img src="${page.dataUrl}" style="width: 100%; height: auto;">`,
+            orderNo: `KERRY-${page.pageNum}`, // 暫時編號，稍後會配對
+            serviceCode: `K${Date.now()}${page.pageNum}`,
+            width: '100mm',
+            height: '150mm',
+            index: index,
+            provider: 'kerry',
+            isPdf: true,
+            isOnlineProcessed: true,
+            pageNumber: page.pageNum,
+            originalWidth: page.width,
+            originalHeight: page.height
+          }));
+          
+          // 儲存到 pdfShippingData
+          pdfShippingData = kerryShippingData;
+          
+          // 更新狀態
+          updateDataStatus();
+          
+          // 自動配對訂單編號
+          autoMatchKerryOrders();
+          
+          showNotification(`已載入 ${kerryShippingData.length} 張嘉里大榮物流單`, 'success');
         }
       });
+
+  // 自動配對嘉里大榮訂單編號
+  function autoMatchKerryOrders() {
+    // 如果已有明細資料，立即配對
+    if (detailData.length > 0 && pdfShippingData.length > 0) {
+      matchKerryOrderNumbers();
+    } else {
+      // 等待明細資料載入後再配對
+      setTimeout(() => {
+        if (detailData.length > 0) {
+          matchKerryOrderNumbers();
+        }
+      }, 2000);
     }
   }
   
+  // 配對嘉里大榮訂單編號
+  function matchKerryOrderNumbers() {
+    // 確保數量相符
+    if (pdfShippingData.length === detailData.length) {
+      // 按順序配對
+      pdfShippingData.forEach((shipping, index) => {
+        if (detailData[index]) {
+          shipping.orderNo = detailData[index].orderNo;
+          shipping.matchedDetailIndex = index;
+        }
+      });
+      
+      // 更新預覽
+      updatePreview();
+      
+      showNotification('已自動配對訂單編號', 'success');
+    } else {
+      showNotification(`物流單數量(${pdfShippingData.length})與明細數量(${detailData.length})不符，請手動調整`, 'warning');
+    }
+  }
+      
   function deactivateDetailPanel() {
     if (!panelActive) return;
     
