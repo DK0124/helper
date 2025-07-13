@@ -610,64 +610,71 @@
     
     return false;
   }
-  
+   
   // === 明細頁面專用函數 ===
   
   function activateDetailPanel() {
     if (panelActive) return;
     
-    // 檢查是否有物流單資料
+    // 移除物流單檢查，讓使用者可以直接使用
+    
+    // 載入資源
+    loadExternalResources();
+    
+    // 隱藏原始控制區域
+    const originalControls = document.querySelector('.ignore-print');
+    if (originalControls) {
+      originalControls.style.display = 'none';
+    }
+    
+    // 建立面板
+    const panel = document.createElement('div');
+    panel.id = 'bv-shipping-assistant-panel';
+    panel.innerHTML = getDetailPanelHTML();
+    panel.style.display = 'block';
+    document.body.appendChild(panel);
+    
+    // 設定預覽區域
+    setupDetailPagePreview();
+    
+    // 初始化
+    setTimeout(() => {
+      initializeDetailEventListeners();
+      loadSavedSettings();
+      loadSavedData();
+      
+      // 如果頁面已有訂單，自動抓取
+      if (document.querySelector('.order-content')) {
+        setTimeout(fetchDetailData, 500);
+      }
+      
+      // 第一次使用時顯示提示
+      if (!localStorage.getItem('bv-print-tip-shown')) {
+        showNotification('提示：如果列印預覽時內容太小，請在列印對話框中將「縮放」設定為「符合頁面大小」', 'info');
+        localStorage.setItem('bv-print-tip-shown', 'true');
+      }
+      
+      // 檢查是否需要顯示嘉里大榮提示
+      checkAndShowKerryTip();
+    }, 100);
+    
+    panelActive = true;
+  }
+  
+  // 新增函數：檢查並顯示嘉里大榮提示
+  function checkAndShowKerryTip() {
+    // 檢查是否已經有嘉里大榮的 PDF 資料
     if (chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(['bvShippingData', 'bvPdfShippingData'], (result) => {
-        // 合併一般物流單和 PDF 物流單
-        const allShippingData = [
-          ...(result.bvShippingData || []),
-          ...(result.bvPdfShippingData || [])
-        ];
-        
-        if (allShippingData.length === 0) {
-          showNotification('請先至物流單頁面抓取物流單，或上傳嘉里大榮 PDF', 'warning');
-          return;
+      chrome.storage.local.get(['bvPdfShippingData', 'kerryTipShown'], (result) => {
+        // 如果沒有 PDF 資料且未顯示過提示
+        if ((!result.bvPdfShippingData || result.bvPdfShippingData.length === 0) && !result.kerryTipShown) {
+          // 延遲一點顯示，避免跟其他提示重疊
+          setTimeout(() => {
+            showNotification('嘉里大榮物流單：可直接上傳 PDF 檔案，系統會自動轉換並整合列印', 'info');
+            // 記錄已顯示過提示
+            chrome.storage.local.set({ kerryTipShown: true });
+          }, 2000);
         }
-        
-        // 載入資源
-        loadExternalResources();
-        
-        // 隱藏原始控制區域
-        const originalControls = document.querySelector('.ignore-print');
-        if (originalControls) {
-          originalControls.style.display = 'none';
-        }
-        
-        // 建立面板
-        const panel = document.createElement('div');
-        panel.id = 'bv-shipping-assistant-panel';
-        panel.innerHTML = getDetailPanelHTML();
-        panel.style.display = 'block';
-        document.body.appendChild(panel);
-        
-        // 設定預覽區域
-        setupDetailPagePreview();
-        
-        // 初始化
-        setTimeout(() => {
-          initializeDetailEventListeners();
-          loadSavedSettings();
-          loadSavedData();
-          
-          // 如果頁面已有訂單，自動抓取
-          if (document.querySelector('.order-content')) {
-            setTimeout(fetchDetailData, 500);
-          }
-          
-          // 第一次使用時顯示提示
-          if (!localStorage.getItem('bv-print-tip-shown')) {
-            showNotification('提示：如果列印預覽時內容太小，請在列印對話框中將「縮放」設定為「符合頁面大小」', 'info');
-            localStorage.setItem('bv-print-tip-shown', 'true');
-          }
-        }, 100);
-        
-        panelActive = true;
       });
     }
   }
