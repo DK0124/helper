@@ -152,7 +152,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   }
 });
 
-// 監聽來自 content script 的訊息
+// 在原有的訊息監聽器中加入
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('收到訊息:', request.action, '來自:', sender.tab?.url);
   
@@ -169,19 +169,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
     
-    case 'captureKTJ':
-      // 處理嘉里大榮截圖請求
+    case 'captureFullPage':
+      // 處理整頁截圖請求
       if (sender.tab) {
-        chrome.tabs.captureVisibleTab(sender.tab.windowId, {
-          format: 'png',
-          quality: 95
-        }, (dataUrl) => {
-          if (chrome.runtime.lastError) {
-            sendResponse({ error: chrome.runtime.lastError.message });
-          } else {
-            sendResponse({ dataUrl: dataUrl });
-          }
-        });
+        captureFullPage(sender.tab, request.orderIds)
+          .then(captures => {
+            sendResponse({ captures: captures });
+          })
+          .catch(error => {
+            sendResponse({ error: error.message });
+          });
         return true; // 保持連線開啟
       }
       break;
@@ -190,10 +187,52 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ status: 'unknown action' });
   }
   
-  // 保持訊息通道開啟
   return true;
 });
 
+// 整頁截圖功能
+async function captureFullPage(tab, orderIds) {
+  try {
+    const captures = [];
+    
+    // 取得頁面尺寸
+    const dimensions = await chrome.tabs.sendMessage(tab.id, {
+      action: 'getPageDimensions'
+    });
+    
+    const pageHeight = dimensions?.height || tab.height;
+    const viewportHeight = tab.height;
+    const numCaptures = Math.ceil(pageHeight / viewportHeight);
+    
+    // 分段截圖
+    for (let i = 0; i < numCaptures; i++) {
+      // 滾動到對應位置
+      await chrome.tabs.sendMessage(tab.id, {
+        action: 'scrollTo',
+        position: i * viewportHeight
+      });
+      
+      // 等待滾動完成
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // 截圖
+      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+        format: 'png',
+        quality: 95
+      });
+      
+      captures.push(dataUrl);
+    }
+    
+    // 如果只需要一張完整圖片，可以在這裡合併
+    // 暫時返回第一張截圖
+    return [captures[0]];
+    
+  } catch (error) {
+    console.error('截圖失敗:', error);
+    throw error;
+  }
+}
 // Service Worker 啟動時執行
 chrome.runtime.onStartup.addListener(() => {
   console.log('BV SHOP 出貨助手 Service Worker 已啟動');
