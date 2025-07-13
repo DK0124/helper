@@ -1,15 +1,16 @@
-// BV SHOP 出貨助手 - 內容腳本 (完整版 - 支援線上處理嘉里大榮 PDF)
+// BV SHOP 出貨助手 - 內容腳本 (完整版 v3.0.0 - 支援線上處理嘉里大榮 PDF)
 (function() {
   'use strict';
   
   console.log('BV SHOP 出貨助手已載入');
   
-  // 等待 PDF.js 載入
+  // 等待 PDF.js 載入的 Promise
   const waitForPdfJs = new Promise((resolve) => {
     let checkCount = 0;
     const checkInterval = setInterval(() => {
       checkCount++;
       
+      // 檢查各種可能的位置
       const pdfjs = window.pdfjsLib || 
                     window['pdfjs-dist/build/pdf'] || 
                     (typeof pdfjsLib !== 'undefined' ? pdfjsLib : null);
@@ -18,7 +19,7 @@
         console.log('PDF.js 已載入');
         clearInterval(checkInterval);
         resolve(pdfjs);
-      } else if (checkCount > 50) {
+      } else if (checkCount > 50) { // 5秒後停止檢查
         console.warn('PDF.js 載入超時');
         clearInterval(checkInterval);
         resolve(null);
@@ -34,7 +35,7 @@
   let panelActive = false;
   let cachedProviderSettings = {};
   let pdfShippingData = [];
-  let pdfjsLib = null;
+  let pdfjsLib = null; // 將在載入後設定
   
   // 初始化時設定 pdfjsLib
   waitForPdfJs.then(pdfjs => {
@@ -1426,35 +1427,6 @@
     }, 3000);
   }
   
-  // 添加動畫樣式
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes slideIn {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-    
-    @keyframes slideOut {
-      from {
-        transform: translateX(0);
-        opacity: 1;
-      }
-      to {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-    }
-  `;
-  document.head.appendChild(style);
-  
-})();
-
   // 添加 CSS 樣式
   const cssStyle = document.createElement('style');
   cssStyle.textContent = `
@@ -1858,11 +1830,50 @@
         right: 10px;
       }
     }
+    
+    /* 進度條修正 */
+    #bv-conversion-progress-fill {
+      width: 100%;
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    #bv-conversion-progress-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: #3b82f6;
+      border-radius: 3px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+    
+    /* 修正因為 JavaScript 動態設定的寬度 */
+    #bv-conversion-progress-fill[style*="width"] {
+      width: 100% !important;
+    }
+    
+    #bv-conversion-progress-fill::after {
+      width: var(--progress-width, 0%);
+    }
   `;
   
   // 只在需要時注入樣式
   if (currentPage.type === 'detail' || currentPage.provider === 'kerry') {
     document.head.appendChild(cssStyle);
+  }
+  
+  // 修正進度條顯示的輔助函數
+  function setProgressWidth(percent) {
+    const progressFill = document.getElementById('bv-conversion-progress-fill');
+    if (progressFill) {
+      progressFill.style.setProperty('--progress-width', percent);
+    }
   }
   
   // 監聽來自 background script 的訊息
@@ -1893,6 +1904,21 @@
       });
     }
   });
+  
+  // 調整 handlePdfFile 函數中的進度條更新
+  const originalHandlePdfFile = handlePdfFile;
+  handlePdfFile = async function(file) {
+    // 使用修正後的進度條更新方法
+    const progressFill = document.getElementById('bv-conversion-progress-fill');
+    const originalSetWidth = (percent) => {
+      if (progressFill) {
+        setProgressWidth(percent);
+      }
+    };
+    
+    // 呼叫原始函數，但使用新的進度條更新方法
+    return originalHandlePdfFile.call(this, file);
+  };
   
   console.log('BV SHOP 出貨助手初始化完成', {
     currentPage,
