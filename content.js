@@ -378,6 +378,8 @@
         </div>
       `;
     }
+    }
+    
   // === 物流單頁面專用函數 ===
   
   function injectShippingPanel() {
