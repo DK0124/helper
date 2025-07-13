@@ -802,15 +802,13 @@
                 </div>
                 <div class="bv-conversion-status" id="bv-conversion-status">準備中...</div>
               </div>
+              <div class="bv-info-text" style="margin-top: 10px; font-size: 12px; color: #666;">
+                <strong>使用說明：</strong><br>
+                1. 從嘉里大榮網站下載物流單 PDF<br>
+                2. 點擊上方區域上傳 PDF 檔案<br>
+                3. 系統會自動轉換並與出貨明細配對列印
+              </div>
             </div>
-            
-            <div class="bv-button-group" style="margin-top: 12px;">
-              <button class="bv-button secondary" id="bv-clear-data">
-                <span class="material-icons">refresh</span>
-                清除重抓
-              </button>
-            </div>
-          </div>
         </div>
         
         <!-- 基本設定 -->
@@ -3113,16 +3111,32 @@
   
   // 根據頁面類型自動執行對應的初始化
   if (currentPage.type === 'shipping') {
-    // 物流單頁自動顯示面板
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
+    console.log('偵測到物流單頁面，類型:', currentPage.provider);
+    
+    // 對於嘉里大榮，只記錄曾經訪問過
+    if (currentPage.provider === 'kerry') {
+      console.log('記錄嘉里大榮物流單頁面訪問');
+      if (chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ 
+          kerryVisited: true,
+          kerryVisitTime: Date.now()
+        });
+      }
+      // 顯示提示訊息
+      showNotification('請至出貨明細頁面上傳嘉里大榮 PDF 檔案', 'info');
+    } 
+    // 其他超商物流單才顯示面板
+    else if (currentPage.provider !== 'unknown') {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          if (checkExtensionValid()) {
+            setTimeout(injectShippingPanel, 300);
+          }
+        });
+      } else {
         if (checkExtensionValid()) {
           setTimeout(injectShippingPanel, 300);
         }
-      });
-    } else {
-      if (checkExtensionValid()) {
-        setTimeout(injectShippingPanel, 300);
       }
     }
   } else if (currentPage.type === 'detail') {
@@ -3134,7 +3148,7 @@
       document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
           activateDetailPanel();
-        }, 500); // 給頁面一點時間載入完成
+        }, 500);
       });
     } else {
       setTimeout(() => {
