@@ -1263,7 +1263,7 @@
     });
   }
   
-  // 處理 PDF 檔案 - 更新版（PDF.js 已在 manifest 中載入）
+  // 處理 PDF 檔案 - 修正版
   async function handlePdfFile(file) {
     const uploadArea = document.getElementById('bv-pdf-upload-area');
     const uploadPrompt = document.getElementById('bv-pdf-upload-prompt');
@@ -1286,14 +1286,34 @@
     statusText.textContent = '載入 PDF...';
     
     try {
-      // 檢查 PDF.js 是否可用
-      if (typeof pdfjsLib === 'undefined') {
-        throw new Error('PDF.js 未載入，請確認 pdf.js 檔案存在');
+      // 檢查各種可能的 PDF.js 位置
+      let pdfjs = null;
+      
+      // 嘗試找到 pdfjsLib
+      if (typeof pdfjsLib !== 'undefined' && pdfjsLib) {
+        pdfjs = pdfjsLib;
+        console.log('找到 pdfjsLib (全域)');
+      } else if (typeof window.pdfjsLib !== 'undefined' && window.pdfjsLib) {
+        pdfjs = window.pdfjsLib;
+        console.log('找到 window.pdfjsLib');
+      } else if (typeof window['pdfjs-dist/build/pdf'] !== 'undefined' && window['pdfjs-dist/build/pdf']) {
+        pdfjs = window['pdfjs-dist/build/pdf'];
+        console.log('找到 window["pdfjs-dist/build/pdf"]');
       }
       
-      // 設定 worker（只需要設定一次）
-      if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.js');
+      if (!pdfjs) {
+        // 列出所有包含 pdf 的全域變數
+        const pdfRelatedKeys = Object.keys(window).filter(key => 
+          key.toLowerCase().includes('pdf') && window[key]
+        );
+        console.error('找不到 PDF.js，相關的全域變數:', pdfRelatedKeys);
+        throw new Error('PDF.js 未載入，請確認 pdf.js 檔案存在並已正確載入');
+      }
+      
+      // 設定 worker
+      if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
+        pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.js');
+        console.log('已設定 PDF.js worker');
       }
       
       // 讀取 PDF 檔案
@@ -1304,7 +1324,8 @@
       statusText.textContent = '解析 PDF...';
       progressFill.style.width = '20%';
       
-      const pdf = await pdfjsLib.getDocument({data: typedArray}).promise;
+      const loadingTask = pdfjs.getDocument({data: typedArray});
+      const pdf = await loadingTask.promise;
       const numPages = pdf.numPages;
       pagesText.textContent = `共 ${numPages} 頁`;
       
@@ -1380,7 +1401,8 @@
       pdfInfo.style.display = 'none';
       progressDiv.classList.remove('active');
     }
-  } 
+  }
+  
   function fetchDetailData() {
     console.log('開始抓取明細');
     detailData = [];
