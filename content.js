@@ -117,179 +117,64 @@
     return { type: 'unknown', provider: null };
   }
   
-  // === 物流單頁面專用函數 ===
-  
-  function injectShippingPanel() {
-    if (document.getElementById('bv-shipping-panel')) return;
+  // 嘉里大榮物流單頁面的特殊處理
+  function handleKerryShippingPage() {
+    console.log('處理嘉里大榮物流單頁面');
     
-    // 檢查是否為嘉里大榮
-    const isKerry = currentPage.provider === 'kerry';
+    // 偵測是否為 PDF 預覽頁面
+    const isPdfPreview = window.location.href.includes('.pdf') || 
+                        document.querySelector('embed[type="application/pdf"]') ||
+                        document.querySelector('object[type="application/pdf"]');
     
-    // 建立浮動面板
-    const panel = document.createElement('div');
-    panel.id = 'bv-shipping-panel';
-    if (isKerry) {
-      panel.classList.add('kerry-mode');
-    }
-    
-    panel.innerHTML = isKerry ? getKerryPanelHTML() : getDefaultPanelHTML();
-    
-    document.body.appendChild(panel);
-    
-    // 事件監聽
-    document.getElementById('bv-minimize-btn').addEventListener('click', () => {
-      panel.classList.toggle('minimized');
-    });
-    
-    if (isKerry) {
-      // 嘉里大榮特殊處理
-      setupKerryHandlers();
-    } else {
-      document.getElementById('bv-fetch-btn').addEventListener('click', fetchShippingData);
-      // 更新狀態
-      updateShippingPanelStatus();
-    }
-  }
-  
-  function getDefaultPanelHTML() {
-    return `
-      <div class="bv-panel-header">
-        <h3>BV SHOP 出貨助手</h3>
-        <div class="bv-panel-controls">
-          <button class="bv-icon-btn" id="bv-minimize-btn" title="最小化">
-            <span style="font-size: 20px; line-height: 1;">－</span>
-          </button>
-        </div>
-      </div>
+    if (isPdfPreview) {
+      console.log('偵測到 PDF 預覽頁面');
       
-      <div class="bv-panel-body">
-        <div class="bv-status-display">
-          <div class="bv-status-count" id="bv-count">0</div>
-          <div class="bv-status-text">張物流單已抓取</div>
-        </div>
-        
-        <button class="bv-button primary pulse" id="bv-fetch-btn">
-          重新抓取物流單
-        </button>
-        
-        <div class="bv-info-text">
-          <strong>操作步驟：</strong><br>
-          1. 點擊「重新抓取物流單」<br>
-          2. 至後台「更多操作」>「列印出貨單」<br>
-          3. 點選擴充功能中的「BV SHOP 出貨助手」
-        </div>
-      </div>
-    `;
-  }
-  
-  function getKerryPanelHTML() {
-    return `
-      <div class="bv-panel-header">
-        <h3>BV SHOP 出貨助手 - 嘉里大榮</h3>
-        <div class="bv-panel-controls">
-          <button class="bv-icon-btn" id="bv-minimize-btn" title="最小化">
-            <span style="font-size: 20px; line-height: 1;">－</span>
-          </button>
-        </div>
-      </div>
+      // 開啟獨立的控制面板視窗
+      openKerryControlPanel();
       
-      <div class="bv-panel-body">
-        <div class="bv-kerry-status">
-          <h4>嘉里大榮物流單偵測</h4>
-          <p id="bv-kerry-status-text">正在偵測 PDF 連結...</p>
-          <div class="bv-download-progress" id="bv-download-progress" style="display: none;">
-            <div class="bv-download-progress-bar" id="bv-download-progress-bar"></div>
-          </div>
-        </div>
-        
-        <button class="bv-button primary" id="bv-download-pdf-btn" style="display: none;">
-          下載物流單 PDF
-        </button>
-        
-        <div class="bv-info-text">
-          <strong>操作步驟：</strong><br>
-          1. 系統會自動偵測並下載 PDF<br>
-          2. 下載完成後，至後台列印頁面<br>
-          3. 上傳下載好的 PDF 檔案<br>
-          4. 系統會自動轉換並整合列印
-        </div>
-      </div>
-    `;
-  }
-  
-  function setupKerryHandlers() {
-    // 自動偵測 PDF 連結
-    detectKerryPDF();
-    
-    // 如果有下載按鈕，設定點擊事件
-    const downloadBtn = document.getElementById('bv-download-pdf-btn');
-    if (downloadBtn) {
-      downloadBtn.addEventListener('click', downloadKerryPDF);
-    }
-  }
-  
-  function detectKerryPDF() {
-    const statusText = document.getElementById('bv-kerry-status-text');
-    const downloadBtn = document.getElementById('bv-download-pdf-btn');
-    
-    // 尋找可能的 PDF 連結
-    const pdfLinks = document.querySelectorAll('a[href*=".pdf"], iframe[src*=".pdf"], embed[src*=".pdf"]');
-    
-    if (pdfLinks.length > 0) {
-      statusText.textContent = `找到 ${pdfLinks.length} 個 PDF 連結`;
-      if (downloadBtn) {
-        downloadBtn.style.display = 'block';
-        downloadBtn.dataset.pdfUrl = pdfLinks[0].href || pdfLinks[0].src;
-      }
-      
-      // 自動下載第一個 PDF
-      const pdfUrl = pdfLinks[0].href || pdfLinks[0].src;
+      // 嘗試取得 PDF URL
+      const pdfUrl = getPdfUrl();
       if (pdfUrl) {
-        downloadKerryPDF(pdfUrl);
+        // 通知控制面板 PDF URL
+        setTimeout(() => {
+          chrome.runtime.sendMessage({
+            action: 'kerryPdfDetected',
+            pdfUrl: pdfUrl
+          });
+        }, 1000);
       }
     } else {
-      // 檢查是否直接顯示 PDF
-      if (window.location.href.includes('.pdf')) {
-        statusText.textContent = '偵測到 PDF 頁面';
-        downloadKerryPDF(window.location.href);
-      } else {
-        statusText.textContent = '未找到 PDF 連結，請手動檢查頁面';
-      }
+      // 一般頁面，注入面板
+      injectShippingPanel();
     }
   }
   
-  function downloadKerryPDF(url) {
-    const statusText = document.getElementById('bv-kerry-status-text');
-    const progressBar = document.getElementById('bv-download-progress');
-    const progressFill = document.getElementById('bv-download-progress-bar');
-    
-    if (!url && event && event.target.dataset.pdfUrl) {
-      url = event.target.dataset.pdfUrl;
+  // 取得 PDF URL
+  function getPdfUrl() {
+    // 如果當前頁面就是 PDF
+    if (window.location.href.includes('.pdf')) {
+      return window.location.href;
     }
     
-    if (!url) {
-      showNotification('無法取得 PDF 連結', 'error');
-      return;
-    }
+    // 尋找 embed 或 object 標籤
+    const embed = document.querySelector('embed[src*=".pdf"]');
+    if (embed) return embed.src;
     
-    statusText.textContent = '正在下載 PDF...';
-    if (progressBar) progressBar.style.display = 'block';
-    if (progressFill) progressFill.style.width = '0%';
+    const object = document.querySelector('object[data*=".pdf"]');
+    if (object) return object.data;
     
-    // 使用 background script 下載
+    // 尋找 iframe
+    const iframe = document.querySelector('iframe[src*=".pdf"]');
+    if (iframe) return iframe.src;
+    
+    return null;
+  }
+  
+  // 開啟嘉里大榮控制面板
+  function openKerryControlPanel() {
+    // 發送訊息給 background script 開啟新視窗
     chrome.runtime.sendMessage({
-      action: 'downloadPDF',
-      url: url,
-      filename: `kerry_shipping_${Date.now()}.pdf`
-    }, (response) => {
-      if (response.success) {
-        statusText.textContent = 'PDF 下載完成！請至後台上傳。';
-        if (progressFill) progressFill.style.width = '100%';
-        showNotification('PDF 下載完成，請至後台列印頁面上傳', 'success');
-      } else {
-        statusText.textContent = '下載失敗，請重試';
-        showNotification('PDF 下載失敗：' + (response.error || '未知錯誤'), 'error');
-      }
+      action: 'openKerryPanel'
     });
   }
   
