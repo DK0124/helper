@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BV SHOP 出貨助手",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "自動抓取嘉里大榮物流單",
   
   "permissions": ["storage"],
@@ -16,15 +16,4 @@
       "js": ["content.js"],
       "run_at": "document_end"
     }
-  ],
-  
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "libs/pdf.min.js",
-        "libs/pdf.worker.min.js"
-      ],
-      "matches": ["<all_urls>"]
-    }
   ]
-}
