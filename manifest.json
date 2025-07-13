@@ -1,22 +1,14 @@
 {
   "manifest_version": 3,
   "name": "BV SHOP 出貨助手",
-  "version": "2.0.1",
+  "version": "1.5.0",
   "description": "自動抓取嘉里大榮物流單",
   
-  "permissions": [
-    "storage",
-    "tabs",
-    "activeTab"    
-  ],
+  "permissions": ["storage"],
   
   "host_permissions": [
     "https://bvshop-manage.bvshop.tw/*"
   ],
-  
-  "background": {
-    "service_worker": "background.js"
-  },
   
   "content_scripts": [
     {
@@ -24,9 +16,5 @@
       "js": ["content.js"],
       "run_at": "document_end"
     }
-  ],
-  
-  "action": {
-    "default_title": "BV SHOP 出貨助手"
-  }
+  ]
 }
