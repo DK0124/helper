@@ -1,4 +1,4 @@
-// BV SHOP 出貨助手 - 內容腳本 (完整版 - 支援物流編號比對與排版調整 + 嘉里大榮支援)
+// BV SHOP 出貨助手 - 內容腳本 (完整版 - 支援物流編號比對與排版調整 + 嘉里大榮支援 - ES Modules 版本)
 (function() {
   'use strict';
   
@@ -12,6 +12,7 @@
   let panelActive = false;
   let cachedProviderSettings = {};
   let pdfShippingData = []; // 儲存從 PDF 轉換的物流單
+  let pdfjsLib = null; // PDF.js 庫實例
   
   // 立即通知 background script
   if (chrome.runtime && chrome.runtime.sendMessage) {
@@ -1245,7 +1246,7 @@
     });
   }
   
-  // 處理 PDF 檔案
+  // 處理 PDF 檔案 - 更新為支援 ES Modules
   async function handlePdfFile(file) {
     const uploadArea = document.getElementById('bv-pdf-upload-area');
     const uploadPrompt = document.getElementById('bv-pdf-upload-prompt');
@@ -1272,14 +1273,10 @@
       const arrayBuffer = await file.arrayBuffer();
       const typedArray = new Uint8Array(arrayBuffer);
       
-      // 初始化 PDF.js
-      if (typeof pdfjsLib === 'undefined') {
-        // 動態載入 PDF.js
-        await loadPdfJs();
+      // 動態載入 PDF.js ES Module
+      if (!pdfjsLib) {
+        await loadPdfJsModule();
       }
-      
-      // 設定 worker
-      pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.js');
       
       // 載入 PDF
       statusText.textContent = '解析 PDF...';
@@ -1363,19 +1360,48 @@
     }
   }
   
-  // 動態載入 PDF.js
-  async function loadPdfJs() {
+  
+  // 動態載入 PDF.js ES Module
+  async function loadPdfJsModule() {
     return new Promise((resolve, reject) => {
-      if (typeof pdfjsLib !== 'undefined') {
-        resolve();
-        return;
-      }
-      
+      // 創建一個 script 標籤來載入 ES module
       const script = document.createElement('script');
-      script.src = chrome.runtime.getURL('pdf.min.js');
-      script.onload = resolve;
-      script.onerror = reject;
+      script.type = 'module';
+      
+      // 創建內聯模組腳本來載入和設定 PDF.js
+      script.textContent = `
+        import * as pdfjsLib from '${chrome.runtime.getURL('pdf.min.mjs')}';
+        
+        // 設定 worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '${chrome.runtime.getURL('pdf.worker.min.mjs')}';
+        
+        // 將 pdfjsLib 掛載到 window 供 content script 使用
+        window.__pdfjsLib = pdfjsLib;
+        
+        // 通知載入完成
+        window.dispatchEvent(new CustomEvent('pdfjsLoaded'));
+      `;
+      
+      // 監聽載入完成事件
+      window.addEventListener('pdfjsLoaded', function handler() {
+        window.removeEventListener('pdfjsLoaded', handler);
+        pdfjsLib = window.__pdfjsLib;
+        resolve();
+      }, { once: true });
+      
+      // 處理載入錯誤
+      script.onerror = (error) => {
+        console.error('載入 PDF.js 失敗:', error);
+        reject(new Error('無法載入 PDF.js 庫'));
+      };
+      
+      // 添加 script 到頁面
       document.head.appendChild(script);
+      
+      // 載入後移除 script 標籤
+      setTimeout(() => {
+        script.remove();
+      }, 1000);
     });
   }
   
