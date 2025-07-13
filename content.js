@@ -3046,46 +3046,46 @@ function matchKerryOrderNumbers() {
     }, 3000);
   }
   
-  // === 主程式執行 ===
+// === 主程式執行 ===
+
+// 根據頁面類型自動執行對應的初始化
+if (currentPage.type === 'shipping') {
+  console.log('偵測到物流單頁面，類型:', currentPage.provider);
   
-  // 根據頁面類型自動執行對應的初始化
-  if (currentPage.type === 'shipping') {
-    console.log('偵測到物流單頁面，類型:', currentPage.provider);
-    
-    if (currentPage.provider === 'kerry') {
-      // 執行嘉里大榮特殊處理
-      handleKerryShippingPage();
-    } 
-    // 其他超商物流單才顯示面板
-    else if (currentPage.provider !== 'unknown') {
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          if (checkExtensionValid()) {
-            setTimeout(injectShippingPanel, 300);
-          }
-        });
-      } else {
+  if (currentPage.provider === 'kerry') {
+    // 執行嘉里大榮特殊處理
+    handleKerryShippingPage();
+  } 
+  // 其他超商物流單才顯示面板
+  else if (currentPage.provider !== 'unknown') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
         if (checkExtensionValid()) {
           setTimeout(injectShippingPanel, 300);
         }
+      });
+    } else {
+      if (checkExtensionValid()) {
+        setTimeout(injectShippingPanel, 300);
       }
     }
   }
-    // 明細頁也自動啟動
-    console.log('BV SHOP 出貨明細頁面已偵測，自動啟動助手');
-    
-    // 自動啟動面板
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-          activateDetailPanel();
-        }, 500);
-      });
-    } else {
+} else if (currentPage.type === 'detail') {
+  // 明細頁也自動啟動
+  console.log('BV SHOP 出貨明細頁面已偵測，自動啟動助手');
+  
+  // 自動啟動面板
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => {
         activateDetailPanel();
       }, 500);
-    }
+    });
+  } else {
+    setTimeout(() => {
+      activateDetailPanel();
+    }, 500);
   }
-  
-})();
+}
+
+})(); 
