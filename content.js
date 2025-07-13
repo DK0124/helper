@@ -66,7 +66,8 @@
       // 未知的 action
       sendResponse({ status: 'unknown action' });
       return true;
-    };
+        }
+    });
   }
 
   // 偵測當前頁面類型
