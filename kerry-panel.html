@@ -1,39 +1,87 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BV SHOP 嘉里大榮助手</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="kerry-panel.css">
 </head>
 <body>
   <div class="panel-container">
     <div class="panel-header">
-      <h3>BV SHOP 嘉里大榮助手</h3>
+      <h3>
+        <span class="material-icons">local_shipping</span>
+        BV SHOP 嘉里大榮助手
+      </h3>
+      <button class="close-btn" id="close-btn" title="關閉">
+        <span class="material-icons">close</span>
+      </button>
     </div>
     
     <div class="panel-body">
+      <!-- 狀態區塊 -->
       <div class="status-section">
-        <h4>狀態</h4>
-        <div id="status-text">等待偵測 PDF...</div>
-        <div class="progress-bar" id="progress-bar" style="display: none;">
+        <h4>
+          <span class="material-icons">info</span>
+          狀態
+        </h4>
+        <div id="status-text" class="status-text">等待偵測 PDF...</div>
+        <div class="progress-bar" id="progress-bar">
           <div class="progress-fill" id="progress-fill"></div>
         </div>
       </div>
       
+      <!-- 控制區塊 -->
       <div class="control-section">
-        <button id="process-btn" class="primary-btn" disabled>
-          開始處理 PDF
-        </button>
+        <h4>
+          <span class="material-icons">settings</span>
+          控制選項
+        </h4>
         
-        <button id="goto-detail-btn" class="secondary-btn">
-          前往出貨明細頁面
-        </button>
+        <div class="control-buttons">
+          <button id="process-btn" class="primary-btn" disabled>
+            <span class="material-icons">transform</span>
+            開始處理 PDF
+          </button>
+          
+          <button id="manual-upload-btn" class="secondary-btn">
+            <span class="material-icons">upload_file</span>
+            手動上傳 PDF
+          </button>
+          <input type="file" id="manual-file-input" accept="application/pdf" style="display: none;">
+          
+          <button id="goto-detail-btn" class="secondary-btn">
+            <span class="material-icons">description</span>
+            前往出貨明細頁面
+          </button>
+        </div>
       </div>
       
-      <div class="info-section">
-        <h4>處理結果</h4>
-        <div id="result-info">尚未處理</div>
+      <!-- 處理結果區塊 -->
+      <div class="result-section">
+        <h4>
+          <span class="material-icons">assignment</span>
+          處理結果
+        </h4>
+        <div id="result-info" class="result-info">
+          <p class="empty-state">尚未處理任何 PDF</p>
+        </div>
       </div>
+      
+      <!-- 預覽區塊 -->
+      <div class="preview-section" id="preview-section" style="display: none;">
+        <h4>
+          <span class="material-icons">preview</span>
+          預覽
+        </h4>
+        <div class="preview-container" id="preview-container"></div>
+      </div>
+    </div>
+    
+    <div class="panel-footer">
+      <p class="footer-text">© 2025 BV SHOP 出貨助手 v2.5.0</p>
     </div>
   </div>
   
