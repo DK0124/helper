@@ -106,15 +106,14 @@
   }
   
   // === 嘉里大榮專用函數 ===
-  
   async function handleKTJPage() {
     console.log('=== 嘉里大榮頁面處理開始 ===');
     
     // 顯示處理中訊息
-    showNotification('偵測到嘉里大榮物流單，開始處理...', 'info');
+    showNotification('偵測到嘉里大榮物流單，開始截圖處理...', 'info');
     
-    // 等待頁面完全載入
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // 等待 PDF 完全載入
+    await waitForPDFLoad();
     
     try {
       // 取得訂單資訊
@@ -123,15 +122,16 @@
       
       console.log('訂單編號:', orderIds);
       
-      // 使用截圖方式處理
-      const success = await captureKTJAsImage(orderIds);
+      // 開始截圖處理
+      const success = await captureKTJPages(orderIds);
       
       if (success) {
         showNotification(`成功處理 ${orderIds.length} 張嘉里大榮物流單！`, 'success');
         
-        // 顯示操作提示
+        // 2秒後自動跳轉
         setTimeout(() => {
-          showNotification('請至後台「更多操作」>「列印出貨單」使用', 'info');
+          const printUrl = 'https://bvshop-manage.bvshop.tw/order_print';
+          window.location.href = printUrl;
         }, 2000);
       }
       
@@ -141,30 +141,84 @@
     }
   }
   
-  async function captureKTJAsImage(orderIds) {
-    try {
-      // 嘗試使用 Chrome API 截圖
-      const response = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ action: 'captureKTJ' }, resolve);
-      });
+  // 等待 PDF 載入完成
+  async function waitForPDFLoad() {
+    return new Promise((resolve) => {
+      let checkCount = 0;
+      const maxChecks = 30; // 最多等待 15 秒
       
-      if (response && response.dataUrl) {
-        // 成功截圖，建立物流單資料
-        const shippingData = orderIds.map((orderId, index) => ({
-          html: `<div class="bv-shipping-wrapper" style="width:100%;max-width:105mm;margin:0 auto;">
-                  <img src="${response.dataUrl}" style="width:100%;display:block;">
-                  <div style="text-align:center;padding:5px;font-size:12px;background:#f5f5f5;">
-                    嘉里大榮 - 訂單 ${orderId}
-                  </div>
-                </div>`,
-          orderNo: orderId,
-          serviceCode: `KTJ${orderId}`,
-          width: '105mm',
-          height: '148mm',
-          index: index,
-          provider: 'ktj',
-          isImage: true
-        }));
+      const checkInterval = setInterval(() => {
+        // 檢查是否有 PDF embed 或 iframe
+        const pdfViewer = document.querySelector('embed[type="application/pdf"], iframe[src*=".pdf"], object[type="application/pdf"]');
+        const canvas = document.querySelector('canvas'); // PDF.js 會使用 canvas
+        
+        if (pdfViewer || canvas || checkCount >= maxChecks) {
+          clearInterval(checkInterval);
+          // 再等待一秒確保完全載入
+          setTimeout(resolve, 1000);
+        }
+        
+        checkCount++;
+      }, 500);
+    });
+  }
+  
+  // 截圖嘉里大榮頁面
+  async function captureKTJPages(orderIds) {
+    try {
+      // 準備截圖
+      const captures = [];
+      
+      // 方案1: 嘗試使用 html2canvas (需要注入)
+      if (typeof html2canvas !== 'undefined') {
+        console.log('使用 html2canvas 截圖');
+        const canvas = await html2canvas(document.body, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          width: window.innerWidth,
+          height: window.innerHeight
+        });
+        
+        const dataUrl = canvas.toDataURL('image/png');
+        captures.push(dataUrl);
+      } 
+      // 方案2: 使用 Chrome 截圖 API
+      else {
+        console.log('使用 Chrome API 截圖');
+        
+        // 發送訊息給 background script 進行截圖
+        const response = await chrome.runtime.sendMessage({
+          action: 'captureFullPage',
+          orderIds: orderIds
+        });
+        
+        if (response && response.captures) {
+          captures.push(...response.captures);
+        }
+      }
+      
+      // 如果成功截圖
+      if (captures.length > 0) {
+        // 為每個訂單建立物流單資料
+        const shippingData = orderIds.map((orderId, index) => {
+          // 如果有多張截圖，使用對應的，否則都用第一張
+          const imageData = captures[index] || captures[0];
+          
+          return {
+            html: `<div class="bv-shipping-wrapper" style="width:100%;height:100%;position:relative;">
+                    <img src="${imageData}" style="width:100%;height:auto;display:block;">
+                  </div>`,
+            orderNo: orderId,
+            serviceCode: `KTJ${orderId}`,
+            width: '105mm',
+            height: '148mm',
+            index: index,
+            provider: 'ktj',
+            isImage: true,
+            imageData: imageData
+          };
+        });
         
         // 儲存資料
         await chrome.storage.local.set({
@@ -174,10 +228,10 @@
         });
         
         return true;
-      } else {
-        // 截圖失敗，使用備用方案
-        return await captureKTJFallback(orderIds);
       }
+      
+      // 如果截圖失敗，使用改進的備用方案
+      return await captureKTJFallback(orderIds);
       
     } catch (error) {
       console.error('截圖失敗:', error);
@@ -185,47 +239,103 @@
     }
   }
   
+  // 改進的備用方案
   async function captureKTJFallback(orderIds) {
-    // 備用方案：創建文字版本的物流單
-    const pdfUrl = location.href;
+    console.log('使用備用方案：可見內容截取');
     
-    const shippingData = orderIds.map((orderId, index) => ({
-      html: `<div class="bv-shipping-wrapper" style="width:100%;max-width:105mm;margin:0 auto;padding:20px;border:2px solid #333;">
-              <h3 style="text-align:center;margin-bottom:20px;">嘉里大榮物流單</h3>
-              <div style="text-align:center;margin:20px 0;">
-                <p style="font-size:18px;font-weight:bold;">訂單編號</p>
-                <p style="font-size:24px;margin:10px 0;">${orderId}</p>
-              </div>
-              <div style="border-top:1px solid #ccc;padding-top:20px;margin-top:20px;">
-                <p style="text-align:center;color:#666;">
-                  請開啟以下連結列印完整物流單：<br>
-                  <a href="${pdfUrl}" target="_blank" style="color:#0066cc;word-break:break-all;">
-                    ${pdfUrl}
-                  </a>
-                </p>
-              </div>
-            </div>`,
-      orderNo: orderId,
-      serviceCode: `KTJ${orderId}`,
-      width: '105mm',
-      height: '148mm',
-      index: index,
-      provider: 'ktj',
-      isPlaceholder: true,
-      pdfUrl: pdfUrl
-    }));
+    // 嘗試找到 PDF 內容區域
+    const pdfContainer = document.querySelector('embed, iframe, object, .pdf-viewer, #pdf-container');
     
-    // 儲存資料
-    await chrome.storage.local.set({
-      bvShippingData: shippingData,
-      lastProvider: 'ktj',
-      timestamp: Date.now(),
-      ktjPdfUrl: pdfUrl
-    });
+    if (pdfContainer) {
+      // 如果找到 PDF 容器，創建包含提示的物流單
+      const rect = pdfContainer.getBoundingClientRect();
+      
+      const shippingData = orderIds.map((orderId, index) => ({
+        html: `<div class="bv-shipping-wrapper" style="width:100%;max-width:105mm;margin:0 auto;">
+                <div style="border:2px solid #333;padding:20px;min-height:400px;background:#f9f9f9;">
+                  <h2 style="text-align:center;color:#333;">嘉里大榮物流單</h2>
+                  <div style="text-align:center;margin:40px 0;">
+                    <p style="font-size:18px;color:#666;">訂單編號</p>
+                    <p style="font-size:36px;font-weight:bold;margin:20px 0;">${orderId}</p>
+                  </div>
+                  <div style="background:#fff;padding:20px;border-radius:8px;margin-top:40px;">
+                    <p style="text-align:center;color:#999;font-size:14px;line-height:1.8;">
+                      <strong>注意：</strong><br>
+                      PDF 物流單已載入但無法直接截圖<br>
+                      請使用瀏覽器列印功能 (Ctrl+P)<br>
+                      選擇「儲存為 PDF」後再列印
+                    </p>
+                  </div>
+                </div>
+              </div>`,
+        orderNo: orderId,
+        serviceCode: `KTJ${orderId}`,
+        width: '105mm',
+        height: '148mm',
+        index: index,
+        provider: 'ktj',
+        needManualPrint: true
+      }));
+      
+      // 儲存資料
+      await chrome.storage.local.set({
+        bvShippingData: shippingData,
+        lastProvider: 'ktj',
+        timestamp: Date.now(),
+        ktjNeedManual: true
+      });
+      
+      return true;
+    }
     
-    return true;
+    // 如果完全找不到內容，返回錯誤
+    return false;
   }
   
+  // 在明細頁面增加嘉里大榮的特殊處理
+  function generateShippingPage(data, settings, customOrderNo) {
+    if (!data) return '';
+    
+    const displayOrderNo = customOrderNo || data.orderNo;
+    
+    // 如果是嘉里大榮的圖片資料，特殊處理
+    if (data.provider === 'ktj' && data.isImage) {
+      return `
+        <div class="bv-shipping-content" style="
+          width: 100mm;
+          height: 150mm;
+          position: relative;
+          overflow: hidden;
+          background: white;
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        ">
+          ${data.html}
+          
+          <!-- 訂單編號標籤（可選） -->
+          ${settings.showOrderNumber && displayOrderNo ? `
+            <div style="
+              position: absolute;
+              top: ${settings.orderLabelTop}mm;
+              left: 50%;
+              transform: translateX(-50%);
+              background: rgba(255,255,255,0.9);
+              padding: 4px 12px;
+              border: 1px solid #333;
+              border-radius: 4px;
+              font-size: ${settings.orderLabelSize}px;
+              font-weight: bold;
+              z-index: 1000;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              white-space: nowrap;
+            ">
+              訂單編號：${displayOrderNo}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
   // === 物流單頁面專用函數 ===
   
   function injectShippingPanel() {
@@ -1725,9 +1835,6 @@
     const displayOrderNo = customOrderNo || data.orderNo;
     
     // 取得當前的超商類型（從儲存的資料或自動偵測）
-    const provider = data.provider || detectProviderFromHTML(data.html) || 'default';
-    
-    // 使用當前超商的設定，如果沒有則使用即時設定
     const layoutSettings = settings.shipping.currentProviderSettings || 
                           settings.shipping.providerSettings?.[provider] || {
       scale: 100,
