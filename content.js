@@ -89,15 +89,21 @@
     else if (hostname.includes('okmart.com.tw')) {
       return { type: 'shipping', provider: 'okmart' };
     }
-    // 嘉里大榮物流單
+    // 嘉里大榮物流單 (外部網站)
     else if (hostname.includes('kerrytj.com')) {
       return { type: 'shipping', provider: 'kerry' };
     }
     // BV SHOP 後台
     else if (hostname.includes('bvshop-manage.bvshop.tw')) {
-      // 只針對列印頁面
-      if (pathname === '/order_print' || pathname.includes('order_print')) {
-        console.log('偵測到 BV SHOP 列印頁面');
+      // 嘉里大榮物流單頁面 (在 BV SHOP 後台內)
+      if (pathname.includes('ktj_logistics') || pathname.includes('kerry')) {
+        console.log('偵測到 BV SHOP 嘉里大榮物流單頁面');
+        return { type: 'shipping', provider: 'kerry' };
+      }
+      // 出貨明細列印頁面
+      else if (pathname === '/order_print' || 
+               (pathname.includes('order_print') && !pathname.includes('ktj'))) {
+        console.log('偵測到 BV SHOP 出貨明細列印頁面');
         return { type: 'detail', provider: 'bvshop' };
       }
     }
