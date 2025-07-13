@@ -1,8 +1,7 @@
-/* BV SHOP 出貨助手 - 樣式表 (支援嘉里大榮版) */
+/* BV SHOP 出貨助手 - 樣式表 (改善版 + 嘉里大榮支援) */
 
 /* 載入字體 */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
-@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 
 /* 物流單頁面的浮動面板 */
 #bv-shipping-panel {
@@ -17,6 +16,154 @@
   animation: slideIn 0.3s ease-out;
   width: 320px;
   color: #1a1a1a;
+}
+
+/* 嘉里大榮專用樣式 */
+#bv-shipping-panel.kerry-mode {
+  width: 380px;
+}
+
+#bv-shipping-panel.kerry-mode .bv-panel-body {
+  padding: 20px;
+}
+
+.bv-kerry-status {
+  background: #f0f7ff;
+  border: 1px solid #2196F3;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.bv-kerry-status h4 {
+  margin: 0 0 8px 0;
+  color: #1976D2;
+  font-size: 16px;
+}
+
+.bv-kerry-status p {
+  margin: 0;
+  color: #555;
+  font-size: 14px;
+}
+
+.bv-download-progress {
+  margin-top: 12px;
+  background: #e3f2fd;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.bv-download-progress-bar {
+  height: 100%;
+  background: #2196F3;
+  width: 0;
+  transition: width 0.3s ease;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* PDF 上傳區域 */
+.bv-pdf-upload-section {
+  background: linear-gradient(135deg, #fff5f5 0%, #fff0f0 100%);
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(244, 67, 54, 0.1);
+}
+
+.bv-pdf-upload-area {
+  border: 3px dashed #f44336;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: white;
+  position: relative;
+}
+
+.bv-pdf-upload-area:hover {
+  border-color: #d32f2f;
+  background: #ffebee;
+}
+
+.bv-pdf-upload-area.has-file {
+  border-style: solid;
+  border-color: #4CAF50;
+  background: #f1f8e9;
+}
+
+.bv-pdf-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #2e7d32;
+}
+
+.bv-pdf-info .material-icons {
+  font-size: 36px;
+}
+
+.bv-pdf-pages-info {
+  text-align: left;
+}
+
+.bv-pdf-pages-info h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #2e7d32;
+}
+
+.bv-pdf-pages-info p {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  color: #558b2f;
+}
+
+/* PDF 轉換進度 */
+.bv-conversion-progress {
+  margin-top: 16px;
+  padding: 16px;
+  background: #e8f5e9;
+  border-radius: 8px;
+  display: none;
+}
+
+.bv-conversion-progress.active {
+  display: block;
+}
+
+.bv-conversion-progress h5 {
+  margin: 0 0 8px 0;
+  color: #2e7d32;
+  font-size: 14px;
+}
+
+.bv-conversion-progress-bar {
+  height: 6px;
+  background: #c8e6c9;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.bv-conversion-progress-fill {
+  height: 100%;
+  background: #4CAF50;
+  width: 0;
+  transition: width 0.3s ease;
+}
+
+.bv-conversion-status {
+  font-size: 12px;
+  color: #558b2f;
+  text-align: center;
 }
 
 @keyframes slideIn {
@@ -141,245 +288,6 @@
   border-top: 1px solid #eef0f2;
   border-radius: 0 0 20px 20px;
   flex-shrink: 0;
-}
-
-/* === 嘉里大榮 PDF 上傳區域 === */
-#bv-ktj-pdf-section {
-  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-  border-radius: 14px;
-  padding: 20px;
-  margin-bottom: 24px;
-  border: 1px solid #7dd3fc;
-}
-
-#bv-ktj-pdf-section .bv-section-header {
-  background: #0284c7;
-  color: white;
-  margin-bottom: 16px;
-}
-
-#bv-ktj-pdf-section .bv-section-header:hover {
-  background: #0369a1;
-}
-
-#bv-ktj-pdf-section .bv-section-header h4 {
-  color: white;
-}
-
-#bv-ktj-pdf-section .bv-section-icon {
-  color: white;
-  background: none;
-  -webkit-text-fill-color: white;
-}
-
-#bv-ktj-pdf-section .bv-section-toggle {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-/* PDF 上傳區域 */
-#bv-ktj-upload-area {
-  border: 3px dashed #0284c7;
-  border-radius: 12px;
-  padding: 40px 20px;
-  text-align: center;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  transition: all 0.3s;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-}
-
-#bv-ktj-upload-area:hover {
-  border-color: #0369a1;
-  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
-}
-
-#bv-ktj-upload-area.bv-dragover {
-  background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%);
-  border-color: #0369a1;
-  border-style: solid;
-}
-
-#bv-ktj-upload-area .material-icons {
-  font-size: 48px;
-  color: #0284c7;
-  margin-bottom: 16px;
-}
-
-#bv-ktj-upload-area .bv-upload-hint {
-  font-size: 16px;
-  color: #0c4a6e;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-}
-
-#bv-ktj-upload-area p:last-child {
-  font-size: 13px;
-  color: #075985;
-  margin: 0;
-}
-
-/* PDF 處理狀態 */
-#bv-ktj-pdf-status {
-  background: white;
-  border: 2px solid #0284c7;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-#bv-ktj-pdf-status.processing {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  border-color: #f59e0b;
-}
-
-#bv-ktj-pdf-status.success {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  border-color: #10b981;
-}
-
-#bv-ktj-pdf-status.error {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  border-color: #ef4444;
-}
-
-#bv-ktj-pdf-status .material-icons {
-  font-size: 24px;
-}
-
-#bv-ktj-pdf-status p {
-  margin: 0;
-  font-weight: 500;
-  flex: 1;
-}
-
-/* PDF 頁面預覽網格 */
-#bv-ktj-pdf-pages {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
-  margin-top: 16px;
-}
-
-#bv-ktj-pdf-pages > div {
-  background: white;
-  border: 2px solid #e0e7ff;
-  border-radius: 8px;
-  padding: 12px;
-  position: relative;
-  transition: all 0.2s;
-}
-
-#bv-ktj-pdf-pages > div:hover {
-  border-color: #0284c7;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
-}
-
-#bv-ktj-pdf-pages img {
-  width: 100%;
-  height: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  display: block;
-}
-
-#bv-ktj-pdf-pages p {
-  margin: 8px 0 0 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #0c4a6e;
-  text-align: center;
-}
-
-/* 進度條 */
-.bv-progress-bar {
-  width: 100%;
-  height: 8px;
-  background: #e0e7ff;
-  border-radius: 4px;
-  overflow: hidden;
-  margin: 12px 0;
-}
-
-.bv-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #0284c7 0%, #0ea5e9 100%);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.bv-progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.3),
-    transparent
-  );
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-/* 嘉里大榮下載指引視窗 */
-.bv-ktj-guide {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: white;
-  border: 3px solid #f59e0b;
-  border-radius: 12px;
-  padding: 30px;
-  z-index: 999999;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-  max-width: 500px;
-  animation: slideIn 0.3s ease-out;
-}
-
-.bv-ktj-guide h2 {
-  color: #d97706;
-  margin: 0 0 20px 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.bv-ktj-guide-content {
-  background: #fef3c7;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-}
-
-.bv-ktj-guide-content ol {
-  margin: 0;
-  padding-left: 20px;
-  line-height: 1.8;
-}
-
-.bv-ktj-guide-content kbd {
-  background: #fed7aa;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: monospace;
-  font-size: 13px;
 }
 
 /* 預設檔區塊 */
@@ -819,6 +727,11 @@
   color: white;
 }
 
+.bv-status-badge.warning {
+  background: #ff9800;
+  color: white;
+}
+
 /* 按鈕樣式 */
 .bv-button {
   width: 100%;
@@ -1113,11 +1026,6 @@ img[src*="SendQRCode.ashx"] {
   color: #dc2626;
 }
 
-.bv-notification.info {
-  border-left: 4px solid #3b82f6;
-  color: #2563eb;
-}
-
 /* 滾動條樣式 */
 .bv-panel-body::-webkit-scrollbar {
   width: 10px;
@@ -1166,7 +1074,6 @@ img[src*="SendQRCode.ashx"] {
   #bv-shipping-assistant-panel,
   #bv-shipping-panel,
   .bv-notification,
-  .bv-ktj-guide,
   .ignore-print,
   body > *:not(#bv-preview-container) {
     display: none !important;
@@ -1300,7 +1207,6 @@ img[src*="SendQRCode.ashx"] {
     margin: 0 auto !important;
   }
 }
-
 /* 響應式設計 */
 @media (max-width: 768px) {
   #bv-shipping-assistant-panel {
