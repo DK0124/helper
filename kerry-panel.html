@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>BV SHOP 嘉里大榮助手</title>
+  <link rel="stylesheet" href="kerry-panel.css">
+</head>
+<body>
+  <div class="panel-container">
+    <div class="panel-header">
+      <h3>BV SHOP 嘉里大榮助手</h3>
+    </div>
+    
+    <div class="panel-body">
+      <div class="status-section">
+        <h4>狀態</h4>
+        <div id="status-text">等待偵測 PDF...</div>
+        <div class="progress-bar" id="progress-bar" style="display: none;">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+      
+      <div class="control-section">
+        <button id="process-btn" class="primary-btn" disabled>
+          開始處理 PDF
+        </button>
+        
+        <button id="goto-detail-btn" class="secondary-btn">
+          前往出貨明細頁面
+        </button>
+      </div>
+      
+      <div class="info-section">
+        <h4>處理結果</h4>
+        <div id="result-info">尚未處理</div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="kerry-panel.js"></script>
+</body>
+</html>
