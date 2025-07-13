@@ -1371,81 +1371,40 @@
       }
     }
     
-    // 載入 PDF.js 庫 - 使用動態 import
+    // 載入 PDF.js 庫 - 使用 CDN 版本（最可靠）
     async function loadPdfJsLibrary() {
-      try {
-        // 如果已經載入過
-        if (pdfjsLib) {
-          return;
-        }
-        
-        // 嘗試使用動態 import
-        if (typeof import === 'function') {
-          const pdfModule = await import(chrome.runtime.getURL('pdf.min.js'));
-          pdfjsLib = pdfModule.default || pdfModule.pdfjsLib || pdfModule;
-          
-          if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.js');
-          }
-          
-          console.log('PDF.js 透過 import 載入成功');
-          return;
-        }
-        
-        // 如果不支援動態 import，使用傳統方式
-        return loadPdfJsLegacy();
-      } catch (error) {
-        console.error('動態 import 失敗，嘗試傳統載入方式:', error);
-        return loadPdfJsLegacy();
-      }
-    }
-    
-    // 傳統載入方式
-    async function loadPdfJsLegacy() {
       return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        
-        // 先創建一個全域回調來接收 PDF.js
-        window.__pdfjs_callback = function(lib) {
-          pdfjsLib = lib;
-          if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.js');
-          }
-          delete window.__pdfjs_callback;
+        // 檢查是否已載入
+        if (window.pdfjsLib) {
+          pdfjsLib = window.pdfjsLib;
           resolve();
+          return;
+        }
+        
+        // 使用 CDN 載入 PDF.js
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        
+        script.onload = () => {
+          // 等待一下讓腳本完全執行
+          setTimeout(() => {
+            if (window.pdfjsLib) {
+              pdfjsLib = window.pdfjsLib;
+              // 設定 worker 使用 CDN
+              pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+              console.log('PDF.js 從 CDN 載入成功');
+              resolve();
+            } else {
+              reject(new Error('PDF.js 載入後無法找到 pdfjsLib'));
+            }
+          }, 100);
         };
         
-        // 包裝 PDF.js 載入
-        script.textContent = `
-          (function() {
-            const originalDefine = window.define;
-            window.define = undefined; // 暫時停用 AMD
-            
-            const script = document.createElement('script');
-            script.src = '${chrome.runtime.getURL('pdf.min.js')}';
-            script.onload = function() {
-              // 還原 define
-              window.define = originalDefine;
-              
-              // 傳遞 pdfjsLib
-              const lib = window.pdfjsLib || window.pdfjsDistBuildPdf || window.pdfjsDist?.build?.pdf;
-              if (lib && window.__pdfjs_callback) {
-                window.__pdfjs_callback(lib);
-              }
-            };
-            document.head.appendChild(script);
-          })();
-        `;
+        script.onerror = () => {
+          reject(new Error('無法從 CDN 載入 PDF.js'));
+        };
         
-        script.onerror = () => reject(new Error('無法載入 PDF.js'));
         document.head.appendChild(script);
-        
-        // 設定超時
-        setTimeout(() => {
-          if (!pdfjsLib) {
-            reject(new Error('PDF.js 載入超時'));
-          }
-        }, 5000);
       });
     }
   
