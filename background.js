@@ -202,5 +202,94 @@ chrome.runtime.onStartup.addListener(() => {
 
 // 處理 Service Worker 的生命週期
 self.addEventListener('activate', event => {
+
+// 處理嘉里大榮面板
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'openKerryPanel') {
+    // 創建一個新的面板視窗
+    chrome.windows.create({
+      url: chrome.runtime.getURL('kerry-panel.html'),
+      type: 'popup',
+      width: 400,
+      height: 600,
+      left: screen.width - 420,
+      top: 20
+    });
+  } else if (request.action === 'processKerryPdf') {
+    // 處理 PDF
+    processKerryPdfOnline(request.pdfUrl).then(result => {
+      sendResponse(result);
+    });
+    return true; // 保持訊息通道開啟
+  }
+});
+
+// 線上處理嘉里大榮 PDF
+async function processKerryPdfOnline(pdfUrl) {
+  try {
+    // 取得 PDF 內容
+    const response = await fetch(pdfUrl);
+    const arrayBuffer = await response.arrayBuffer();
+    
+    // 載入 PDF.js
+    const pdfjsLib = await loadPdfJs();
+    
+    // 解析 PDF
+    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+    const numPages = pdf.numPages;
+    
+    const processedPages = [];
+    
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      
+      // 使用更高的解析度來獲得更好的圖片品質
+      const scale = 3.0; // 提高到 3 倍解析度
+      const viewport = page.getViewport({ scale });
+      
+      // 創建 canvas
+      const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+      const context = canvas.getContext('2d');
+      
+      // 渲染 PDF 頁面
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+      
+      // 轉換為高品質 JPEG
+      const blob = await canvas.convertToBlob({
+        type: 'image/jpeg',
+        quality: 0.95 // 95% 品質
+      });
+      
+      // 轉換為 data URL
+      const reader = new FileReader();
+      const dataUrl = await new Promise((resolve) => {
+        reader.onload = e => resolve(e.target.result);
+        reader.readAsDataURL(blob);
+      });
+      
+      processedPages.push({
+        pageNum,
+        dataUrl,
+        width: viewport.width / scale,
+        height: viewport.height / scale
+      });
+    }
+    
+    return {
+      success: true,
+      pages: processedPages,
+      totalPages: numPages
+    };
+  } catch (error) {
+    console.error('處理 PDF 失敗:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
   console.log('Service Worker 已啟動');
 });
