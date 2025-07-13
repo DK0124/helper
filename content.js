@@ -1371,7 +1371,7 @@
       }
     }
     
-    // 載入 PDF.js 庫 - 使用 CDN 版本（最可靠）
+    // 載入 PDF.js 庫 - 本地檔案版本
     async function loadPdfJsLibrary() {
       return new Promise((resolve, reject) => {
         // 檢查是否已載入
@@ -1381,27 +1381,40 @@
           return;
         }
         
-        // 使用 CDN 載入 PDF.js
+        // 創建 script 標籤載入 PDF.js
         const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        script.src = chrome.runtime.getURL('pdf.js'); // 注意：使用 pdf.js 而不是 pdf.min.js
         
         script.onload = () => {
-          // 等待一下讓腳本完全執行
+          // 等待腳本執行
           setTimeout(() => {
-            if (window.pdfjsLib) {
-              pdfjsLib = window.pdfjsLib;
-              // 設定 worker 使用 CDN
-              pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-              console.log('PDF.js 從 CDN 載入成功');
+            // 嘗試各種可能的命名空間
+            const possiblePdfjsLib = 
+              window.pdfjsLib || 
+              window.pdfjsDistBuildPdf || 
+              window.pdfjsDist || 
+              (window.pdfjsDist && window.pdfjsDist.build && window.pdfjsDist.build.pdf);
+            
+            if (possiblePdfjsLib) {
+              pdfjsLib = possiblePdfjsLib;
+              // 設定 worker
+              if (pdfjsLib.GlobalWorkerOptions) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.js');
+              }
+              console.log('PDF.js 載入成功');
               resolve();
             } else {
-              reject(new Error('PDF.js 載入後無法找到 pdfjsLib'));
+              console.error('無法找到 pdfjsLib，可用的全域物件：', 
+                Object.keys(window).filter(key => key.toLowerCase().includes('pdf'))
+              );
+              reject(new Error('無法找到 PDF.js 庫'));
             }
-          }, 100);
+          }, 200);
         };
         
-        script.onerror = () => {
-          reject(new Error('無法從 CDN 載入 PDF.js'));
+        script.onerror = (error) => {
+          console.error('載入 PDF.js 失敗：', error);
+          reject(new Error('無法載入 PDF.js 檔案'));
         };
         
         document.head.appendChild(script);
