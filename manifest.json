@@ -57,11 +57,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "pdf.min.js",
-        "pdf.worker.min.js",
-        "pdf.min.mjs",
-        "pdf.worker.min.mjs",
-        "pdf-loader.js"
+        "pdf.js",
+        "pdf.worker.js"
       ],
       "matches": ["<all_urls>"]
     }
