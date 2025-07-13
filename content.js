@@ -868,29 +868,29 @@ async function loadPDFJS() {
   if (window.pdfjsLib) return;
   
   return new Promise((resolve, reject) => {
+    // 方法 1：使用外部腳本載入
     const script = document.createElement('script');
-    script.type = 'module';
-    script.textContent = `
-      import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.93/build/pdf.min.mjs";
-      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.93/build/pdf.worker.min.mjs";
-      window.pdfjsLib = pdfjsLib;
+    script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.93/build/pdf.min.mjs';
+    
+    const workerScript = document.createElement('script');
+    workerScript.textContent = `
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.93/build/pdf.worker.min.mjs';
     `;
     
     script.onload = () => {
-      setTimeout(() => {
-        if (window.pdfjsLib) {
-          resolve();
-        } else {
-          reject(new Error('PDF.js 載入失敗'));
-        }
-      }, 100);
+      // 設定 worker
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.93/build/pdf.worker.min.mjs';
+        resolve();
+      } else {
+        reject(new Error('PDF.js 載入失敗'));
+      }
     };
     
-    script.onerror = reject;
+    script.onerror = () => reject(new Error('無法載入 PDF.js'));
     document.head.appendChild(script);
   });
 }
-
 // === 初始化面板功能 ===
 function initPanelFunctions() {
   // 載入資料按鈕
