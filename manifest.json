@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BV SHOP 出貨助手",
-  "description": "自動整合物流單與出貨明細，支援自訂格式與批次列印（含嘉里大榮）",
+  "description": "自動整合物流單與出貨明細，支援自訂格式與批次列印",
   "version": "2.5.0",
   "author": "Derek Yu",
   "icons": {
@@ -12,7 +12,7 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "downloads"
   ],
   "host_permissions": [
     "*://*.7-11.com.tw/*",
@@ -21,13 +21,9 @@
     "*://*.hilife.com.tw/*",
     "*://*.okmart.com.tw/*",
     "*://*.bvshop.tw/*",
-    "*://bvshop-manage.bvshop.tw/*"
-  ],
-  "web_accessible_resources": [
-  {
-    "resources": ["inject.js"],
-    "matches": ["<all_urls>"]
-  }
+    "*://bvshop-manage.bvshop.tw/*",
+    "*://*.kerrytj.com/*",
+    "*://kerrytj.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -41,9 +37,11 @@
         "*://*.hilife.com.tw/*",
         "*://*.okmart.com.tw/*",
         "*://*.bvshop.tw/*",
-        "*://bvshop-manage.bvshop.tw/*"
+        "*://bvshop-manage.bvshop.tw/*",
+        "*://*.kerrytj.com/*",
+        "*://kerrytj.com/*"
       ],
-      "js": ["content.js"],
+      "js": ["pdf.min.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }
@@ -55,5 +53,11 @@
       "128": "icons/icon-128.png"
     },
     "default_title": "BV SHOP 出貨助手"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["pdf.worker.min.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
