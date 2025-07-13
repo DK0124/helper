@@ -177,6 +177,73 @@
       action: 'openKerryPanel'
     });
   }
+
+// 在適當的位置加入缺少的 injectShippingPanel 函數
+function injectShippingPanel() {
+  console.log('注入物流單面板');
+  
+  // 檢查是否已存在面板
+  if (document.getElementById('bv-shipping-panel')) {
+    console.log('面板已存在');
+    return;
+  }
+  
+  // 創建面板
+  const panel = document.createElement('div');
+  panel.id = 'bv-shipping-panel';
+  panel.innerHTML = `
+    <div class="bv-panel-content">
+      <h3>BV SHOP 出貨助手</h3>
+      <p>物流單抓取工具</p>
+      
+      <div class="bv-status">
+        <span>已抓取：</span>
+        <span id="bv-count">0</span>
+        <span>張物流單</span>
+      </div>
+      
+      <button id="bv-fetch-btn" class="bv-btn pulse">
+        抓取物流單
+      </button>
+      
+      <div class="bv-actions">
+        <button id="bv-goto-detail" class="bv-action-btn">
+          前往出貨明細頁面
+        </button>
+      </div>
+      
+      <div class="bv-footer">
+        <small>v2.5.0</small>
+      </div>
+    </div>
+  `;
+  
+  // 插入到頁面
+  document.body.appendChild(panel);
+  
+  // 初始化事件監聽
+  initializeShippingPanelEvents();
+  
+  // 更新狀態
+  updateShippingPanelStatus();
+}
+
+// 初始化物流單面板事件
+function initializeShippingPanelEvents() {
+  // 抓取按鈕
+  const fetchBtn = document.getElementById('bv-fetch-btn');
+  if (fetchBtn) {
+    fetchBtn.addEventListener('click', fetchShippingData);
+  }
+  
+  // 前往明細頁面按鈕
+  const gotoDetailBtn = document.getElementById('bv-goto-detail');
+  if (gotoDetailBtn) {
+    gotoDetailBtn.addEventListener('click', () => {
+      window.open('https://bvshop-manage.bvshop.tw/order_print', '_blank');
+    });
+  }
+}
   
   function updateShippingPanelStatus() {
     if (chrome.storage && chrome.storage.local) {
