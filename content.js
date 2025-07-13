@@ -1,4 +1,4 @@
-// BV SHOP 出貨助手 - 內容腳本 (完整版 - 支援物流編號比對與排版調整 + 嘉里大榮支援 - ES Modules 版本)
+// BV SHOP 出貨助手 - 內容腳本 (完整版 - 支援物流編號比對與排版調整 + 嘉里大榮支援)
 (function() {
   'use strict';
   
@@ -1246,164 +1246,152 @@
     });
   }
   
-  // 處理 PDF 檔案 - 更新為支援 ES Modules
-  async function handlePdfFile(file) {
-    const uploadArea = document.getElementById('bv-pdf-upload-area');
-    const uploadPrompt = document.getElementById('bv-pdf-upload-prompt');
-    const pdfInfo = document.getElementById('bv-pdf-info');
-    const filename = document.getElementById('bv-pdf-filename');
-    const pagesText = document.getElementById('bv-pdf-pages');
-    const progressDiv = document.getElementById('bv-conversion-progress');
-    const progressFill = document.getElementById('bv-conversion-progress-fill');
-    const statusText = document.getElementById('bv-conversion-status');
-    
-    // 顯示檔案資訊
-    uploadArea.classList.add('has-file');
-    uploadPrompt.style.display = 'none';
-    pdfInfo.style.display = 'flex';
-    filename.textContent = file.name;
-    
-    // 顯示轉換進度
-    progressDiv.classList.add('active');
-    progressFill.style.width = '0%';
-    statusText.textContent = '載入 PDF...';
-    
-    try {
-      // 讀取 PDF 檔案
-      const arrayBuffer = await file.arrayBuffer();
-      const typedArray = new Uint8Array(arrayBuffer);
+  // 處理 PDF 檔案 - 修正 CSP 問題
+    async function handlePdfFile(file) {
+      const uploadArea = document.getElementById('bv-pdf-upload-area');
+      const uploadPrompt = document.getElementById('bv-pdf-upload-prompt');
+      const pdfInfo = document.getElementById('bv-pdf-info');
+      const filename = document.getElementById('bv-pdf-filename');
+      const pagesText = document.getElementById('bv-pdf-pages');
+      const progressDiv = document.getElementById('bv-conversion-progress');
+      const progressFill = document.getElementById('bv-conversion-progress-fill');
+      const statusText = document.getElementById('bv-conversion-status');
       
-      // 動態載入 PDF.js ES Module
-      if (!pdfjsLib) {
-        await loadPdfJsModule();
+      // 顯示檔案資訊
+      uploadArea.classList.add('has-file');
+      uploadPrompt.style.display = 'none';
+      pdfInfo.style.display = 'flex';
+      filename.textContent = file.name;
+      
+      // 顯示轉換進度
+      progressDiv.classList.add('active');
+      progressFill.style.width = '0%';
+      statusText.textContent = '載入 PDF...';
+      
+      try {
+        // 讀取 PDF 檔案
+        const arrayBuffer = await file.arrayBuffer();
+        const typedArray = new Uint8Array(arrayBuffer);
+        
+        // 載入 PDF.js
+        if (!pdfjsLib) {
+          await loadPdfJsLibrary();
+        }
+        
+        // 載入 PDF
+        statusText.textContent = '解析 PDF...';
+        progressFill.style.width = '20%';
+        
+        const pdf = await pdfjsLib.getDocument({data: typedArray}).promise;
+        const numPages = pdf.numPages;
+        pagesText.textContent = `共 ${numPages} 頁`;
+        
+        // 轉換每一頁為圖片
+        pdfShippingData = [];
+        
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          statusText.textContent = `轉換第 ${pageNum}/${numPages} 頁...`;
+          progressFill.style.width = `${20 + (pageNum / numPages * 70)}%`;
+          
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 2.0 }); // 使用較高解析度
+          
+          // 創建 canvas
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          
+          // 渲染 PDF 頁面到 canvas
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise;
+          
+          // 轉換為圖片
+          const imageData = canvas.toDataURL('image/png');
+          
+          // 創建物流單資料
+          const shippingItem = {
+            html: `<img src="${imageData}" style="width: 100%; height: auto;">`,
+            orderNo: `KERRY-${pageNum}`, // 使用頁碼作為臨時訂單編號
+            serviceCode: `K${Date.now()}${pageNum}`, // 生成唯一的服務代碼
+            width: '100mm',
+            height: '150mm',
+            index: pageNum - 1,
+            provider: 'kerry',
+            isPdf: true,
+            pageNumber: pageNum,
+            totalPages: numPages
+          };
+          
+          pdfShippingData.push(shippingItem);
+        }
+        
+        // 儲存 PDF 物流單資料
+        if (chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ bvPdfShippingData: pdfShippingData }, () => {
+            statusText.textContent = `轉換完成！已產生 ${numPages} 張物流單`;
+            progressFill.style.width = '100%';
+            
+            // 更新狀態
+            updateDataStatus();
+            updatePreview();
+            
+            showNotification(`成功轉換 ${numPages} 頁 PDF 為物流單`, 'success');
+            
+            // 3秒後隱藏進度條
+            setTimeout(() => {
+              progressDiv.classList.remove('active');
+            }, 3000);
+          });
+        }
+        
+      } catch (error) {
+        console.error('處理 PDF 時發生錯誤:', error);
+        statusText.textContent = '轉換失敗';
+        showNotification('PDF 處理失敗：' + error.message, 'error');
+        
+        // 重置狀態
+        uploadArea.classList.remove('has-file');
+        uploadPrompt.style.display = 'flex';
+        pdfInfo.style.display = 'none';
+        progressDiv.classList.remove('active');
       }
-      
-      // 載入 PDF
-      statusText.textContent = '解析 PDF...';
-      progressFill.style.width = '20%';
-      
-      const pdf = await pdfjsLib.getDocument({data: typedArray}).promise;
-      const numPages = pdf.numPages;
-      pagesText.textContent = `共 ${numPages} 頁`;
-      
-      // 轉換每一頁為圖片
-      pdfShippingData = [];
-      
-      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-        statusText.textContent = `轉換第 ${pageNum}/${numPages} 頁...`;
-        progressFill.style.width = `${20 + (pageNum / numPages * 70)}%`;
+    }
+    
+    // 載入 PDF.js 庫 - 使用外部腳本方式避免 CSP 問題
+    async function loadPdfJsLibrary() {
+      return new Promise((resolve, reject) => {
+        // 檢查是否已載入
+        if (window.pdfjsLib) {
+          pdfjsLib = window.pdfjsLib;
+          resolve();
+          return;
+        }
         
-        const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2.0 }); // 使用較高解析度
+        // 創建 script 標籤載入 PDF.js
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('pdf.min.js');
         
-        // 創建 canvas
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        
-        // 渲染 PDF 頁面到 canvas
-        await page.render({
-          canvasContext: context,
-          viewport: viewport
-        }).promise;
-        
-        // 轉換為圖片
-        const imageData = canvas.toDataURL('image/png');
-        
-        // 創建物流單資料
-        const shippingItem = {
-          html: `<img src="${imageData}" style="width: 100%; height: auto;">`,
-          orderNo: `KERRY-${pageNum}`, // 使用頁碼作為臨時訂單編號
-          serviceCode: `K${Date.now()}${pageNum}`, // 生成唯一的服務代碼
-          width: '100mm',
-          height: '150mm',
-          index: pageNum - 1,
-          provider: 'kerry',
-          isPdf: true,
-          pageNumber: pageNum,
-          totalPages: numPages
+        script.onload = () => {
+          if (window.pdfjsLib) {
+            pdfjsLib = window.pdfjsLib;
+            // 設定 worker
+            pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.js');
+            resolve();
+          } else {
+            reject(new Error('PDF.js 載入後無法找到 pdfjsLib'));
+          }
         };
         
-        pdfShippingData.push(shippingItem);
-      }
-      
-      // 儲存 PDF 物流單資料
-      if (chrome.storage && chrome.storage.local) {
-        chrome.storage.local.set({ bvPdfShippingData: pdfShippingData }, () => {
-          statusText.textContent = `轉換完成！已產生 ${numPages} 張物流單`;
-          progressFill.style.width = '100%';
-          
-          // 更新狀態
-          updateDataStatus();
-          updatePreview();
-          
-          showNotification(`成功轉換 ${numPages} 頁 PDF 為物流單`, 'success');
-          
-          // 3秒後隱藏進度條
-          setTimeout(() => {
-            progressDiv.classList.remove('active');
-          }, 3000);
-        });
-      }
-      
-    } catch (error) {
-      console.error('處理 PDF 時發生錯誤:', error);
-      statusText.textContent = '轉換失敗';
-      showNotification('PDF 處理失敗：' + error.message, 'error');
-      
-      // 重置狀態
-      uploadArea.classList.remove('has-file');
-      uploadPrompt.style.display = 'flex';
-      pdfInfo.style.display = 'none';
-      progressDiv.classList.remove('active');
+        script.onerror = () => {
+          reject(new Error('無法載入 PDF.js'));
+        };
+        
+        document.head.appendChild(script);
+      });
     }
-  }
-  
-  
-  // 動態載入 PDF.js ES Module
-  async function loadPdfJsModule() {
-    return new Promise((resolve, reject) => {
-      // 創建一個 script 標籤來載入 ES module
-      const script = document.createElement('script');
-      script.type = 'module';
-      
-      // 創建內聯模組腳本來載入和設定 PDF.js
-      script.textContent = `
-        import * as pdfjsLib from '${chrome.runtime.getURL('pdf.min.mjs')}';
-        
-        // 設定 worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '${chrome.runtime.getURL('pdf.worker.min.mjs')}';
-        
-        // 將 pdfjsLib 掛載到 window 供 content script 使用
-        window.__pdfjsLib = pdfjsLib;
-        
-        // 通知載入完成
-        window.dispatchEvent(new CustomEvent('pdfjsLoaded'));
-      `;
-      
-      // 監聽載入完成事件
-      window.addEventListener('pdfjsLoaded', function handler() {
-        window.removeEventListener('pdfjsLoaded', handler);
-        pdfjsLib = window.__pdfjsLib;
-        resolve();
-      }, { once: true });
-      
-      // 處理載入錯誤
-      script.onerror = (error) => {
-        console.error('載入 PDF.js 失敗:', error);
-        reject(new Error('無法載入 PDF.js 庫'));
-      };
-      
-      // 添加 script 到頁面
-      document.head.appendChild(script);
-      
-      // 載入後移除 script 標籤
-      setTimeout(() => {
-        script.remove();
-      }, 1000);
-    });
-  }
   
   function fetchDetailData() {
     console.log('開始抓取明細');
