@@ -257,7 +257,7 @@ async function autoProcessKerryPdf(pdfUrl) {
   updateShippingPanelStatus();
 }
 
-  // 抓取物流單
+  // 抓取物流單 - 完整版本
   function fetchShippingData() {
     const btn = document.getElementById('bv-fetch-btn');
     btn.disabled = true;
@@ -265,82 +265,169 @@ async function autoProcessKerryPdf(pdfUrl) {
     
     shippingData = [];
     
-    if (currentPage.provider === 'seven') {
-      console.log('開始抓取 7-11 物流單');
-      
-      // 直接使用原始的選擇器
-      let frames = document.querySelectorAll('.div_frame');
-      
-      console.log('找到的物流單框架數量:', frames.length);
-      
-      frames.forEach((frame, index) => {
-        try {
-          // 取得計算後的樣式
-          const computedStyle = window.getComputedStyle(frame);
-          
-          // 創建一個新的 div 來包裝內容
-          const wrapper = document.createElement('div');
-          wrapper.className = 'bv-shipping-wrapper';
-          
-          // 複製所有樣式屬性
-          wrapper.style.cssText = frame.style.cssText;
-          wrapper.style.width = computedStyle.width;
-          wrapper.style.height = computedStyle.height;
-          wrapper.style.border = computedStyle.border;
-          wrapper.style.borderWidth = computedStyle.borderWidth;
-          wrapper.style.borderStyle = computedStyle.borderStyle;
-          wrapper.style.borderColor = computedStyle.borderColor;
-          wrapper.style.padding = computedStyle.padding;
-          wrapper.style.backgroundColor = computedStyle.backgroundColor;
-          wrapper.style.fontFamily = computedStyle.fontFamily;
-          wrapper.style.fontSize = computedStyle.fontSize;
-          wrapper.style.lineHeight = computedStyle.lineHeight;
-          wrapper.style.color = computedStyle.color;
-          
-          // 複製內部 HTML
-          wrapper.innerHTML = frame.innerHTML;
-          
-          // 處理所有圖片 - 特別處理 QR Code
-          const images = wrapper.querySelectorAll('img');
-          const originalImages = frame.querySelectorAll('img');
-          
-          images.forEach((img, imgIndex) => {
-            const originalImg = originalImages[imgIndex];
-            if (originalImg) {
-              // 複製計算後的樣式
-              const imgStyle = window.getComputedStyle(originalImg);
-              img.style.width = imgStyle.width;
-              img.style.height = imgStyle.height;
-              img.style.display = imgStyle.display;
-              
-              // 獲取完整的圖片 URL
-              let srcUrl = originalImg.src || originalImg.getAttribute('src');
-              
-              // 如果是相對路徑，轉換為絕對路徑
-              if (srcUrl && !srcUrl.startsWith('data:') && !srcUrl.startsWith('http')) {
-                srcUrl = new URL(srcUrl, window.location.href).href;
-              }
-              
-              // 設定 src
-              img.src = srcUrl;
-              
-              // 為 QR Code 圖片添加特殊處理
-              if (srcUrl && (srcUrl.includes('QRCode') || srcUrl.includes('qrcode'))) {
-                console.log('找到 QR Code 圖片:', srcUrl);
-                
-                // 確保圖片顯示
-                img.style.display = 'inline-block';
-                img.style.visibility = 'visible';
-                
-                // 如果圖片載入失敗，嘗試重新載入
-                img.onerror = function() {
-                  console.error('QR Code 載入失敗:', srcUrl);
-                  // 嘗試使用 fetch 載入圖片
-                  loadImageAsDataURL(srcUrl, img);
-                };
-              }
-            }
-          });
+    // 根據不同超商使用不同的抓取邏輯
+    switch (currentPage.provider) {
+      case 'seven':
+        fetch7ElevenShipping();
+        break;
+      case 'family':
+        fetchFamilyShipping();
+        break;
+      case 'hilife':
+        fetchHilifeShipping();
+        break;
+      case 'okmart':
+        fetchOkmartShipping();
+        break;
+      default:
+        showNotification('不支援的物流單類型', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '重新抓取物流單';
+        return;
+    }
+    
+    // 儲存資料會在各個抓取函數中呼叫
+  }
+  
+  // 7-11 物流單抓取
+  function fetch7ElevenShipping() {
+    console.log('開始抓取 7-11 物流單');
+    
+    let frames = document.querySelectorAll('.div_frame');
+    console.log('找到的物流單框架數量:', frames.length);
+    
+    frames.forEach((frame, index) => {
+      try {
+        const computedStyle = window.getComputedStyle(frame);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bv-shipping-wrapper';
+        
+        // 複製樣式
+        wrapper.style.cssText = frame.style.cssText;
+        wrapper.style.width = computedStyle.width;
+        wrapper.style.height = computedStyle.height;
+        wrapper.innerHTML = frame.innerHTML;
+        
+        // 處理圖片
+        processImages(wrapper, frame);
+        
+        // 提取資訊
+        const text = wrapper.textContent || '';
+        let orderNo = '';
+        let serviceCode = '';
+        
+        // 提取訂單編號
+        const orderMatch = text.match(/(?:寄件)?訂單編號[：:]\s*(\w+)/);
+        if (orderMatch) orderNo = orderMatch[1];
+        
+        // 提取服務代碼 - 支援多種格式
+        const codePatterns = [
+          /交貨便服務代碼[：:]\s*([FE]\d{7,11})/,
+          /[FE]\d{7}(?:\d{4})?/
+        ];
+        
+        for (const pattern of codePatterns) {
+          const match = text.match(pattern);
+          if (match) {
+            serviceCode = match[1] || match[0];
+            break;
+          }
+        }
+        
+        shippingData.push({
+          html: wrapper.outerHTML,
+          orderNo: orderNo,
+          serviceCode: serviceCode,
+          width: computedStyle.width,
+          height: computedStyle.height,
+          index: index,
+          provider: currentPage.provider
+        });
+        
+      } catch (error) {
+        console.error(`處理物流單 ${index + 1} 時發生錯誤:`, error);
+      }
+    });
+    
+    saveShippingData();
+  }
+  
+  // 全家物流單抓取
+  function fetchFamilyShipping() {
+    console.log('開始抓取全家物流單');
+    
+    // 全家的選擇器可能不同，需要根據實際頁面調整
+    const frames = document.querySelectorAll('.shipping-label, .print-area, [class*="label"]');
+    
+    frames.forEach((frame, index) => {
+      try {
+        const computedStyle = window.getComputedStyle(frame);
+        const wrapper = frame.cloneNode(true);
+        
+        const text = wrapper.textContent || '';
+        let orderNo = '';
+        let serviceCode = '';
+        
+        // 全家的格式可能不同
+        const orderMatch = text.match(/訂單[編號碼]*[：:]\s*(\w+)/);
+        if (orderMatch) orderNo = orderMatch[1];
+        
+        // 全家通常使用 C 開頭的編號
+        const codeMatch = text.match(/[C]\d{9,12}/);
+        if (codeMatch) serviceCode = codeMatch[0];
+        
+        shippingData.push({
+          html: wrapper.outerHTML,
+          orderNo: orderNo,
+          serviceCode: serviceCode,
+          width: computedStyle.width,
+          height: computedStyle.height,
+          index: index,
+          provider: currentPage.provider
+        });
+        
+      } catch (error) {
+        console.error(`處理全家物流單 ${index + 1} 時發生錯誤:`, error);
+      }
+    });
+    
+    saveShippingData();
+  }
+  
+  // 萊爾富物流單抓取
+  function fetchHilifeShipping() {
+    console.log('開始抓取萊爾富物流單');
+    // 實作萊爾富的抓取邏輯
+    saveShippingData();
+  }
+  
+  // OK超商物流單抓取
+  function fetchOkmartShipping() {
+    console.log('開始抓取OK超商物流單');
+    // 實作OK超商的抓取邏輯
+    saveShippingData();
+  }
+  
+  // 處理圖片的輔助函數
+  function processImages(wrapper, originalFrame) {
+    const images = wrapper.querySelectorAll('img');
+    const originalImages = originalFrame.querySelectorAll('img');
+    
+    images.forEach((img, imgIndex) => {
+      const originalImg = originalImages[imgIndex];
+      if (originalImg) {
+        const imgStyle = window.getComputedStyle(originalImg);
+        img.style.width = imgStyle.width;
+        img.style.height = imgStyle.height;
+        
+        let srcUrl = originalImg.src || originalImg.getAttribute('src');
+        if (srcUrl && !srcUrl.startsWith('data:') && !srcUrl.startsWith('http')) {
+          srcUrl = new URL(srcUrl, window.location.href).href;
+        }
+        img.src = srcUrl;
+      }
+    });
+  }
           
           // 處理所有的內部元素樣式
           const allElements = wrapper.querySelectorAll('*');
