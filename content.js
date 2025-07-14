@@ -121,31 +121,69 @@
   function handleKerryShippingPage() {
     console.log('處理嘉里大榮物流單頁面');
     
-    // 偵測是否為 PDF 預覽頁面
-    const isPdfPreview = window.location.href.includes('.pdf') || 
-                        document.querySelector('embed[type="application/pdf"]') ||
-                        document.querySelector('object[type="application/pdf"]');
-    
-    if (isPdfPreview) {
-      console.log('偵測到 PDF 預覽頁面，開始自動處理');
+    // 如果是 PDF 預覽頁面，直接開始處理
+    if (isPdfPage()) {
+      console.log('偵測到嘉里大榮 PDF 頁面，開始自動處理...');
       
-      // 取得 PDF URL
-      const pdfUrl = getPdfUrl();
-      if (pdfUrl) {
-        // 自動處理 PDF
-        autoProcessKerryPdf(pdfUrl);
-      }
+      // 延遲一秒確保頁面載入完成
+      setTimeout(() => {
+        autoProcessKerryPdf();
+      }, 1000);
     } else {
-      // 一般嘉里大榮頁面，顯示提示
+      // 非 PDF 頁面，顯示提示
       showKerryNotification();
     }
   }
-
-  // 自動處理嘉里大榮 PDF
-  async function autoProcessKerryPdf(pdfUrl) {
+  
+  // 檢查是否為 PDF 頁面
+  function isPdfPage() {
+    // 檢查 URL
+    if (window.location.href.includes('.pdf')) {
+      return true;
+    }
+    
+    // 檢查頁面內容
+    const hasPdfEmbed = document.querySelector('embed[type="application/pdf"]') !== null;
+    const hasPdfObject = document.querySelector('object[type="application/pdf"]') !== null;
+    const hasPdfIframe = document.querySelector('iframe[src*=".pdf"]') !== null;
+    
+    // 檢查 content-type
+    const isPdfContentType = document.contentType === 'application/pdf';
+    
+    return hasPdfEmbed || hasPdfObject || hasPdfIframe || isPdfContentType;
+  }
+  
+  // 取得 PDF URL
+  function getPdfUrl() {
+    // 如果當前頁面就是 PDF
+    if (window.location.href.includes('.pdf')) {
+      return window.location.href;
+    }
+    
+    // 尋找 embed 標籤
+    const embed = document.querySelector('embed[src*=".pdf"]');
+    if (embed) return embed.src;
+    
+    // 尋找 object 標籤
+    const objectElement = document.querySelector('object[data*=".pdf"]');
+    if (objectElement) return objectElement.data;
+    
+    // 尋找 iframe
+    const iframe = document.querySelector('iframe[src*=".pdf"]');
+    if (iframe) return iframe.src;
+    
+    return null;
+  }
+  
+  // 自動處理嘉里大榮 PDF（簡化版，不需要傳入 URL）
+  async function autoProcessKerryPdf() {
     try {
-      // 顯示處理中的提示
-      showProcessingOverlay();
+      // 取得 PDF URL
+      const pdfUrl = getPdfUrl() || window.location.href;
+      console.log('PDF URL:', pdfUrl);
+      
+      // 顯示處理中的提示（更簡潔）
+      showProcessingNotification();
       
       // 發送到 background script 處理
       const result = await chrome.runtime.sendMessage({
@@ -158,72 +196,203 @@
         await chrome.storage.local.set({
           kerryProcessedPages: result.pages,
           kerryProcessTime: Date.now(),
-          kerryAutoProcessed: true
+          kerryAutoProcessed: true,
+          kerryPdfUrl: pdfUrl
         });
         
         // 顯示成功訊息
-        hideProcessingOverlay();
-        showNotification(`成功處理 ${result.totalPages} 頁嘉里大榮物流單`, 'success');
+        hideProcessingNotification();
         
-        // 3秒後自動跳轉到出貨明細頁面
-        setTimeout(() => {
-          if (confirm('PDF 已自動處理完成！是否前往出貨明細頁面？')) {
-            window.location.href = 'https://bvshop-manage.bvshop.tw/order_print';
-          }
-        }, 1000);
+        // 顯示完成通知並提供跳轉選項
+        showCompletionNotification(result.totalPages);
         
       } else {
         throw new Error(result.error || '處理失敗');
       }
       
     } catch (error) {
-      hideProcessingOverlay();
+      hideProcessingNotification();
       console.error('自動處理 PDF 失敗:', error);
-      showNotification('自動處理失敗，請重試', 'error');
+      
+      // 顯示錯誤但提供重試選項
+      showErrorNotification(error.message);
     }
   }
-
-  // 顯示處理中的覆蓋層
-  function showProcessingOverlay() {
-    const overlay = document.createElement('div');
-    overlay.id = 'bv-processing-overlay';
-    overlay.innerHTML = `
-      <div style="
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 30px;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        text-align: center;
-        z-index: 10001;
-      ">
-        <div class="bv-spinner"></div>
-        <h3>正在處理 PDF...</h3>
-        <p>請稍候，系統正在自動轉換物流單</p>
+  
+  // 顯示處理中通知（更簡潔）
+  function showProcessingNotification() {
+    // 移除舊的通知
+    const oldNotification = document.getElementById('bv-kerry-notification');
+    if (oldNotification) oldNotification.remove();
+    
+    const notification = document.createElement('div');
+    notification.id = 'bv-kerry-notification';
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #5865F2;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 999999;
+      max-width: 350px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+    
+    notification.innerHTML = `
+      <div class="bv-spinner" style="
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      "></div>
+      <div>
+        <h4 style="margin: 0 0 5px 0; font-size: 16px;">正在處理嘉里大榮物流單</h4>
+        <p style="margin: 0; font-size: 14px; opacity: 0.9;">請稍候，系統正在轉換 PDF...</p>
       </div>
     `;
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.5);
-      z-index: 10000;
+    
+    // 添加旋轉動畫
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
     `;
-    document.body.appendChild(overlay);
+    document.head.appendChild(style);
+    
+    document.body.appendChild(notification);
   }
   
-  // 隱藏處理中的覆蓋層
-  function hideProcessingOverlay() {
-    const overlay = document.getElementById('bv-processing-overlay');
-    if (overlay) overlay.remove();
+  // 隱藏處理中通知
+  function hideProcessingNotification() {
+    const notification = document.getElementById('bv-kerry-notification');
+    if (notification) {
+      notification.style.transition = 'opacity 0.3s';
+      notification.style.opacity = '0';
+      setTimeout(() => notification.remove(), 300);
+    }
   }
   
-  // 顯示嘉里大榮提示
+  // 顯示完成通知
+  function showCompletionNotification(totalPages) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10B981;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 999999;
+      max-width: 400px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+    
+    notification.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+        <span style="font-size: 24px;">✅</span>
+        <div>
+          <h4 style="margin: 0 0 5px 0; font-size: 16px;">處理完成！</h4>
+          <p style="margin: 0; font-size: 14px;">成功處理 ${totalPages} 頁嘉里大榮物流單</p>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button onclick="window.location.href='https://bvshop-manage.bvshop.tw/order_print'" style="
+          background: white;
+          color: #10B981;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 14px;
+        ">前往出貨明細</button>
+        <button onclick="this.parentElement.parentElement.remove()" style="
+          background: rgba(255,255,255,0.2);
+          color: white;
+          border: 1px solid rgba(255,255,255,0.3);
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+        ">關閉</button>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // 10秒後自動移除
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.style.transition = 'opacity 0.3s';
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+      }
+    }, 10000);
+  }
+  
+  // 顯示錯誤通知
+  function showErrorNotification(errorMessage) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #EF4444;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 999999;
+      max-width: 400px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+    
+    notification.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+        <span style="font-size: 24px;">❌</span>
+        <div>
+          <h4 style="margin: 0 0 5px 0; font-size: 16px;">處理失敗</h4>
+          <p style="margin: 0; font-size: 14px;">${errorMessage}</p>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button onclick="location.reload()" style="
+          background: white;
+          color: #EF4444;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 14px;
+        ">重新整理</button>
+        <button onclick="this.parentElement.parentElement.remove()" style="
+          background: rgba(255,255,255,0.2);
+          color: white;
+          border: 1px solid rgba(255,255,255,0.3);
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+        ">關閉</button>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+  }
+  
+  // 顯示嘉里大榮提示（當不是 PDF 頁面時）
   function showKerryNotification() {
     const notification = document.createElement('div');
     notification.style.cssText = `
@@ -232,19 +401,41 @@
       right: 20px;
       background: #5865F2;
       color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      z-index: 9999;
-      max-width: 300px;
+      padding: 20px 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 999999;
+      max-width: 350px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     `;
+    
     notification.innerHTML = `
-      <h4 style="margin: 0 0 10px 0;">BV SHOP 出貨助手</h4>
-      <p style="margin: 0;">請開啟嘉里大榮物流單 PDF 檔案，系統將自動處理。</p>
+      <h4 style="margin: 0 0 10px 0; font-size: 16px;">BV SHOP 出貨助手</h4>
+      <p style="margin: 0; font-size: 14px; line-height: 1.5;">
+        請開啟嘉里大榮物流單 PDF 檔案，系統將自動處理。
+      </p>
+      <button onclick="this.parentElement.remove()" style="
+        margin-top: 15px;
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.3);
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+      ">知道了</button>
     `;
+    
     document.body.appendChild(notification);
     
-    setTimeout(() => notification.remove(), 5000);
+    // 5秒後自動移除
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.style.transition = 'opacity 0.3s';
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+      }
+    }, 5000);
   }
 
   // 取得 PDF URL
