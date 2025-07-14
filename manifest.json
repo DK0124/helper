@@ -1,3 +1,53 @@
+Skip to content
+Navigation Menu
+Copilot
+Spaces
+print
+
+Type / to search
+Workbench
+
+manifest.json
+Press Delete to close.
+69 lines · 2 KB
+
+manifest.json file contents
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
 {
   "manifest_version": 3,
   "name": "BV SHOP 出貨助手",
@@ -34,36 +84,5 @@
       "matches": [
         "*://*.7-11.com.tw/*",
         "*://*.family.com.tw/*",
-        "*://*.famiport.com.tw/*",
-        "*://*.hilife.com.tw/*",
-        "*://*.okmart.com.tw/*",
-        "*://*.bvshop.tw/*",
-        "*://bvshop-manage.bvshop.tw/*",
-        "*://*.kerrytj.com/*",
-        "*://kerrytj.com/*"
-      ],
-      "js": [
-        "content.js"
-      ],
-      "css": ["content.css"],
-      "run_at": "document_idle"
-    }
-  ],
-  "action": {
-    "default_icon": {
-      "16": "icons/icon-16.png",
-      "48": "icons/icon-48.png",
-      "128": "icons/icon-128.png"
-    },
-    "default_title": "BV SHOP 出貨助手"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "pdf.js",
-        "pdf.worker.js"
-      ],
-      "matches": ["<all_urls>"]
-    }
-  ]
-}
+Copilot said: 當然可以！以下是簡化方案： - **content.js**：直接執行主腳本，動態載入 PDF.js，不再需要 pdf-loader.js。 - **background.js**：僅負責注入 content script 當然可以！以下是簡化方案： content.js：直接執行主腳本，動態載入 PDF.js，不再需要 pdf-loader.js。 background.js：僅負責注入 content script 與處理 basic 下載。 manifest.json：只掛 content.js、background.js。 pdf.worker.js、pdf.js：全部放在根目錄，web_accessible_resources 正確配置。 content.css：樣式檔保留。 你只需要這幾個檔案： manifest.json { "manifest_version": 3, "name": "BV SHOP 出貨助手", "description": "自動整合物流單與出貨明細，支援自訂格式與批次列印", "version": "2.5.0", "author": "Derek Yu", background.js // BV SHOP 出貨助手 - 背景腳本 (簡化版) // 僅負責注入 content.js，處理下載請求 chrome.action.onClicked.addListener(async (tab) => { // 嘗試發送 ping try { content.js // BV SHOP 出貨助手 - 內容腳本 (簡化 + PDF.js 動態載入) (function() { 'use strict'; // 動態載入 PDF.js async function ensurePdfJsLoaded() { content.css /* 保留你原本的 content.css，這裡不重複貼出 */ PDF.js 及 worker 保留 pdf.js、pdf.worker.js 於根目錄或 /，並確保 web_accessible_resources 設定正確即可。 說明 content.js 會在需要時才動態載入 pdf.js，不需要再有 pdf-loader.js、pdf.min.mjs 等多餘載入器。 嘉里大榮 PDF 頁直接自動觸發下載，不顯示任何面板。 其他功能與你的原始流程一致，僅將 PDF.js 動態載入與 PDF 下載自動化。 background.js 僅負責注入 content.js 及下載支持，極簡設計。 若要進一步精簡檔案，pdf.js、pdf.worker.js 可用官方壓縮版，只需一份即可，content.js 動態載入即可。 如需完整功能（如浮動面板與列印邏輯），可將主流程複製回 content.js 內，僅需將 PDF 上傳/解析區段改用 ensurePdfJsLoaded。 如需進一步合併/內嵌 css 進 content.js 也可，請告知你想要的合併方式！
+Fetching repositories…
