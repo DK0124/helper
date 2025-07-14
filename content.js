@@ -257,37 +257,37 @@ async function autoProcessKerryPdf(pdfUrl) {
   updateShippingPanelStatus();
 }
 
-// 初始化物流單面板事件
-function initializeShippingPanelEvents() {
-  // 抓取按鈕
-  const fetchBtn = document.getElementById('bv-fetch-btn');
-  if (fetchBtn) {
-    fetchBtn.addEventListener('click', fetchShippingData);
-  }
-  
-  // 前往明細頁面按鈕
-  const gotoDetailBtn = document.getElementById('bv-goto-detail');
-  if (gotoDetailBtn) {
-    gotoDetailBtn.addEventListener('click', () => {
-      window.open('https://bvshop-manage.bvshop.tw/order_print', '_blank');
-    });
-  }
-}
-  
-  function updateShippingPanelStatus() {
-    if (chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(['bvShippingData'], (result) => {
-        const count = document.getElementById('bv-count');
-        const fetchBtn = document.getElementById('bv-fetch-btn');
-        if (count && result.bvShippingData) {
-          count.textContent = result.bvShippingData.length;
-          if (result.bvShippingData.length > 0 && fetchBtn) {
-            fetchBtn.classList.remove('pulse');
-          }
-        }
+  // 初始化物流單面板事件
+  function initializeShippingPanelEvents() {
+    // 抓取按鈕
+    const fetchBtn = document.getElementById('bv-fetch-btn');
+    if (fetchBtn) {
+      fetchBtn.addEventListener('click', fetchShippingData);
+    }
+    
+    // 前往明細頁面按鈕
+    const gotoDetailBtn = document.getElementById('bv-goto-detail');
+    if (gotoDetailBtn) {
+      gotoDetailBtn.addEventListener('click', () => {
+        window.open('https://bvshop-manage.bvshop.tw/order_print', '_blank');
       });
     }
   }
+    
+    function updateShippingPanelStatus() {
+      if (chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(['bvShippingData'], (result) => {
+          const count = document.getElementById('bv-count');
+          const fetchBtn = document.getElementById('bv-fetch-btn');
+          if (count && result.bvShippingData) {
+            count.textContent = result.bvShippingData.length;
+            if (result.bvShippingData.length > 0 && fetchBtn) {
+              fetchBtn.classList.remove('pulse');
+            }
+          }
+        });
+      }
+    }
   
   // 抓取物流單
   function fetchShippingData() {
