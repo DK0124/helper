@@ -791,37 +791,22 @@ function matchKerryOrderNumbers() {
               </div>
             </div>
             
-            <!-- 嘉里大榮 PDF 上傳區 -->
-            <div class="bv-pdf-upload-section" id="bv-pdf-upload-section">
-              <div class="bv-control-group-title">嘉里大榮 PDF 物流單</div>
-              <div class="bv-pdf-upload-area" id="bv-pdf-upload-area">
-                <input type="file" id="bv-pdf-input" accept="application/pdf" style="display:none;">
-                <div id="bv-pdf-upload-prompt">
-                  <span class="material-icons" style="font-size:48px; color: #f44336;">picture_as_pdf</span>
-                  <div class="bv-upload-hint">點擊上傳嘉里大榮物流單 PDF</div>
-                </div>
-                <div id="bv-pdf-info" class="bv-pdf-info" style="display:none;">
-                  <span class="material-icons">check_circle</span>
-                  <div class="bv-pdf-pages-info">
-                    <h4 id="bv-pdf-filename">檔案名稱</h4>
-                    <p id="bv-pdf-pages">共 0 頁</p>
-                  </div>
-                </div>
-              </div>
-              <div class="bv-conversion-progress" id="bv-conversion-progress">
-                <h5>正在轉換 PDF...</h5>
-                <div class="bv-conversion-progress-bar">
-                  <div class="bv-conversion-progress-fill" id="bv-conversion-progress-fill"></div>
-                </div>
-                <div class="bv-conversion-status" id="bv-conversion-status">準備中...</div>
-              </div>
-              <div class="bv-info-text" style="margin-top: 10px; font-size: 12px; color: #666;">
-                <strong>使用說明：</strong><br>
-                1. 從嘉里大榮網站下載物流單 PDF<br>
-                2. 點擊上方區域上傳 PDF 檔案<br>
-                3. 系統會自動轉換並與出貨明細配對列印
+            <!-- 嘉里大榮狀態顯示 -->
+            <div class="bv-kerry-status" id="bv-kerry-status" style="display:none;">
+              <div class="bv-info-box">
+                <span class="material-icons" style="color: #f44336;">local_shipping</span>
+                <span>嘉里大榮物流單已自動處理</span>
               </div>
             </div>
+            
+            <!-- 操作按鈕 -->
+            <div class="bv-action-buttons" style="margin-top: 15px;">
+              <button class="bv-small-button" id="bv-clear-data">
+                <span class="material-icons" style="font-size: 16px;">delete_sweep</span>
+                清除所有資料
+              </button>
+            </div>
+          </div>
         </div>
         
         <!-- 基本設定 -->
