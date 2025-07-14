@@ -117,71 +117,71 @@
     return { type: 'unknown', provider: null };
   }
   
-// 修改 handleKerryShippingPage 函數
-function handleKerryShippingPage() {
-  console.log('處理嘉里大榮物流單頁面');
-  
-  // 偵測是否為 PDF 預覽頁面
-  const isPdfPreview = window.location.href.includes('.pdf') || 
-                      document.querySelector('embed[type="application/pdf"]') ||
-                      document.querySelector('object[type="application/pdf"]');
-  
-  if (isPdfPreview) {
-    console.log('偵測到 PDF 預覽頁面，開始自動處理');
+  // 修改 handleKerryShippingPage 函數
+  function handleKerryShippingPage() {
+    console.log('處理嘉里大榮物流單頁面');
     
-    // 取得 PDF URL
-    const pdfUrl = getPdfUrl();
-    if (pdfUrl) {
-      // 自動處理 PDF
-      autoProcessKerryPdf(pdfUrl);
+    // 偵測是否為 PDF 預覽頁面
+    const isPdfPreview = window.location.href.includes('.pdf') || 
+                        document.querySelector('embed[type="application/pdf"]') ||
+                        document.querySelector('object[type="application/pdf"]');
+    
+    if (isPdfPreview) {
+      console.log('偵測到 PDF 預覽頁面，開始自動處理');
+      
+      // 取得 PDF URL
+      const pdfUrl = getPdfUrl();
+      if (pdfUrl) {
+        // 自動處理 PDF
+        autoProcessKerryPdf(pdfUrl);
+      }
+    } else {
+      // 一般嘉里大榮頁面，顯示提示
+      showKerryNotification();
     }
-  } else {
-    // 一般嘉里大榮頁面，顯示提示
-    showKerryNotification();
   }
-}
 
-// 自動處理嘉里大榮 PDF
-async function autoProcessKerryPdf(pdfUrl) {
-  try {
-    // 顯示處理中的提示
-    showProcessingOverlay();
-    
-    // 發送到 background script 處理
-    const result = await chrome.runtime.sendMessage({
-      action: 'processKerryPdf',
-      pdfUrl: pdfUrl
-    });
-    
-    if (result.success) {
-      // 儲存處理結果
-      await chrome.storage.local.set({
-        kerryProcessedPages: result.pages,
-        kerryProcessTime: Date.now(),
-        kerryAutoProcessed: true
+  // 自動處理嘉里大榮 PDF
+  async function autoProcessKerryPdf(pdfUrl) {
+    try {
+      // 顯示處理中的提示
+      showProcessingOverlay();
+      
+      // 發送到 background script 處理
+      const result = await chrome.runtime.sendMessage({
+        action: 'processKerryPdf',
+        pdfUrl: pdfUrl
       });
       
-      // 顯示成功訊息
+      if (result.success) {
+        // 儲存處理結果
+        await chrome.storage.local.set({
+          kerryProcessedPages: result.pages,
+          kerryProcessTime: Date.now(),
+          kerryAutoProcessed: true
+        });
+        
+        // 顯示成功訊息
+        hideProcessingOverlay();
+        showNotification(`成功處理 ${result.totalPages} 頁嘉里大榮物流單`, 'success');
+        
+        // 3秒後自動跳轉到出貨明細頁面
+        setTimeout(() => {
+          if (confirm('PDF 已自動處理完成！是否前往出貨明細頁面？')) {
+            window.location.href = 'https://bvshop-manage.bvshop.tw/order_print';
+          }
+        }, 1000);
+        
+      } else {
+        throw new Error(result.error || '處理失敗');
+      }
+      
+    } catch (error) {
       hideProcessingOverlay();
-      showNotification(`成功處理 ${result.totalPages} 頁嘉里大榮物流單`, 'success');
-      
-      // 3秒後自動跳轉到出貨明細頁面
-      setTimeout(() => {
-        if (confirm('PDF 已自動處理完成！是否前往出貨明細頁面？')) {
-          window.location.href = 'https://bvshop-manage.bvshop.tw/order_print';
-        }
-      }, 1000);
-      
-    } else {
-      throw new Error(result.error || '處理失敗');
+      console.error('自動處理 PDF 失敗:', error);
+      showNotification('自動處理失敗，請重試', 'error');
     }
-    
-  } catch (error) {
-    hideProcessingOverlay();
-    console.error('自動處理 PDF 失敗:', error);
-    showNotification('自動處理失敗，請重試', 'error');
   }
-}
 
   // 顯示處理中的覆蓋層
   function showProcessingOverlay() {
@@ -246,16 +246,118 @@ async function autoProcessKerryPdf(pdfUrl) {
     
     setTimeout(() => notification.remove(), 5000);
   }
-  
-  // 插入到頁面
-  document.body.appendChild(panel);
-  
-  // 初始化事件監聽
-  initializeShippingPanelEvents();
-  
-  // 更新狀態
-  updateShippingPanelStatus();
-}
+
+  // 取得 PDF URL
+  function getPdfUrl() {
+    // 如果當前頁面就是 PDF
+    if (window.location.href.includes('.pdf')) {
+      return window.location.href;
+    }
+    
+    // 尋找 embed 或 object 標籤
+    const embed = document.querySelector('embed[src*=".pdf"]');
+    if (embed) return embed.src;
+    
+    const object = document.querySelector('object[data*=".pdf"]');
+    if (object) return object.data;
+    
+    // 尋找 iframe
+    const iframe = document.querySelector('iframe[src*=".pdf"]');
+    if (iframe) return iframe.src;
+    
+    return null;
+  }
+
+  // 開啟嘉里大榮控制面板
+  function openKerryControlPanel() {
+    // 發送訊息給 background script 開啟新視窗
+    chrome.runtime.sendMessage({
+      action: 'openKerryPanel'
+    });
+  }
+
+  // 注入物流單面板
+  function injectShippingPanel() {
+    console.log('注入物流單面板');
+    
+    // 檢查是否已存在面板
+    if (document.getElementById('bv-shipping-panel')) {
+      console.log('面板已存在');
+      return;
+    }
+    
+    // 創建面板
+    const panel = document.createElement('div');
+    panel.id = 'bv-shipping-panel';
+    panel.innerHTML = `
+      <div class="bv-panel-content">
+        <h3>BV SHOP 出貨助手</h3>
+        <p>物流單抓取工具</p>
+        
+        <div class="bv-status">
+          <span>已抓取：</span>
+          <span id="bv-count">0</span>
+          <span>張物流單</span>
+        </div>
+        
+        <button id="bv-fetch-btn" class="bv-btn pulse">
+          抓取物流單
+        </button>
+        
+        <div class="bv-actions">
+          <button id="bv-goto-detail" class="bv-action-btn">
+            前往出貨明細頁面
+          </button>
+        </div>
+        
+        <div class="bv-footer">
+          <small>v2.5.0</small>
+        </div>
+      </div>
+    `;
+    
+    // 插入到頁面
+    document.body.appendChild(panel);
+    
+    // 初始化事件監聽
+    initializeShippingPanelEvents();
+    
+    // 更新狀態
+    updateShippingPanelStatus();
+  }
+
+  // 初始化物流單面板事件
+  function initializeShippingPanelEvents() {
+    // 抓取按鈕
+    const fetchBtn = document.getElementById('bv-fetch-btn');
+    if (fetchBtn) {
+      fetchBtn.addEventListener('click', fetchShippingData);
+    }
+    
+    // 前往明細頁面按鈕
+    const gotoDetailBtn = document.getElementById('bv-goto-detail');
+    if (gotoDetailBtn) {
+      gotoDetailBtn.addEventListener('click', () => {
+        window.open('https://bvshop-manage.bvshop.tw/order_print', '_blank');
+      });
+    }
+  }
+
+  // 更新物流單面板狀態
+  function updateShippingPanelStatus() {
+    if (chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(['bvShippingData'], (result) => {
+        const count = document.getElementById('bv-count');
+        const fetchBtn = document.getElementById('bv-fetch-btn');
+        if (count && result.bvShippingData) {
+          count.textContent = result.bvShippingData.length;
+          if (result.bvShippingData.length > 0 && fetchBtn) {
+            fetchBtn.classList.remove('pulse');
+          }
+        }
+      });
+    }
+  }
 
   // 抓取物流單 - 完整版本
   function fetchShippingData() {
@@ -311,6 +413,29 @@ async function autoProcessKerryPdf(pdfUrl) {
         // 處理圖片
         processImages(wrapper, frame);
         
+        // 處理所有的內部元素樣式
+        const allElements = wrapper.querySelectorAll('*');
+        const originalElements = frame.querySelectorAll('*');
+        
+        allElements.forEach((el, elIndex) => {
+          if (originalElements[elIndex]) {
+            const originalStyle = window.getComputedStyle(originalElements[elIndex]);
+            // 複製重要的樣式屬性
+            el.style.margin = originalStyle.margin;
+            el.style.padding = originalStyle.padding;
+            el.style.fontSize = originalStyle.fontSize;
+            el.style.fontWeight = originalStyle.fontWeight;
+            el.style.textAlign = originalStyle.textAlign;
+            el.style.lineHeight = originalStyle.lineHeight;
+            el.style.display = originalStyle.display;
+            el.style.position = originalStyle.position;
+            el.style.top = originalStyle.top;
+            el.style.left = originalStyle.left;
+            el.style.right = originalStyle.right;
+            el.style.bottom = originalStyle.bottom;
+          }
+        });
+        
         // 提取資訊
         const text = wrapper.textContent || '';
         let orderNo = '';
@@ -333,6 +458,8 @@ async function autoProcessKerryPdf(pdfUrl) {
             break;
           }
         }
+        
+        console.log(`物流單 ${index + 1} - 訂單編號: ${orderNo || '未找到'}, 服務代碼: ${serviceCode || '未找到'}`);
         
         shippingData.push({
           html: wrapper.outerHTML,
@@ -427,88 +554,6 @@ async function autoProcessKerryPdf(pdfUrl) {
         img.src = srcUrl;
       }
     });
-  }
-          
-          // 處理所有的內部元素樣式
-          const allElements = wrapper.querySelectorAll('*');
-          const originalElements = frame.querySelectorAll('*');
-          
-          allElements.forEach((el, elIndex) => {
-            if (originalElements[elIndex]) {
-              const originalStyle = window.getComputedStyle(originalElements[elIndex]);
-              // 複製重要的樣式屬性
-              el.style.margin = originalStyle.margin;
-              el.style.padding = originalStyle.padding;
-              el.style.fontSize = originalStyle.fontSize;
-              el.style.fontWeight = originalStyle.fontWeight;
-              el.style.textAlign = originalStyle.textAlign;
-              el.style.lineHeight = originalStyle.lineHeight;
-              el.style.display = originalStyle.display;
-              el.style.position = originalStyle.position;
-              el.style.top = originalStyle.top;
-              el.style.left = originalStyle.left;
-              el.style.right = originalStyle.right;
-              el.style.bottom = originalStyle.bottom;
-            }
-          });
-          
-          // 提取資訊
-          let orderNo = '';
-          let serviceCode = '';
-          const text = wrapper.textContent || '';
-          
-          // 提取訂單編號
-          const orderMatch = text.match(/(?:寄件)?訂單編號[：:]\s*(\w+)/);
-          if (orderMatch) {
-            orderNo = orderMatch[1];
-          }
-          
-          // 方法 1: 從特定元素取得
-          const serviceCodeElement = wrapper.querySelector('span[id*="lblC2BPinCode"]');
-          if (serviceCodeElement) {
-            serviceCode = serviceCodeElement.textContent.trim();
-            console.log(`  從 lblC2BPinCode 取得: ${serviceCode}`);
-          }
-          
-          // 方法 2: 從文字中尋找
-          if (!serviceCode) {
-            // 尋找 "交貨便服務代碼：" 後面的編號
-            const serviceMatch = text.match(/交貨便服務代碼[：:]\s*([A-Z]\d{11,12})/);
-            if (serviceMatch) {
-              serviceCode = serviceMatch[1];
-              console.log(`  從文字匹配取得: ${serviceCode}`);
-            }
-          }
-          
-          // 方法 3: 尋找任何 F 或 E 開頭的編號
-          if (!serviceCode) {
-            // 支援 8 碼或 12 碼格式
-            const codeMatch = text.match(/[FE]\d{7}(?:\d{4})?/);
-            if (codeMatch) {
-              serviceCode = codeMatch[0];
-              console.log(`  從編號匹配取得: ${serviceCode} (${serviceCode.length}碼)`);
-            }
-          }
-          
-          console.log(`物流單 ${index + 1} - 訂單編號: ${orderNo || '未找到'}, 服務代碼: ${serviceCode || '未找到'}`);
-          
-          shippingData.push({
-            html: wrapper.outerHTML,
-            orderNo: orderNo,
-            serviceCode: serviceCode,
-            width: computedStyle.width,
-            height: computedStyle.height,
-            index: index,
-            provider: currentPage.provider // 記錄超商類型
-          });
-          
-        } catch (error) {
-          console.error(`處理物流單 ${index + 1} 時發生錯誤:`, error);
-        }
-      });
-    }
-    
-    saveShippingData();
   }
   
   // 簡化的圖片處理方式
@@ -703,78 +748,77 @@ async function autoProcessKerryPdf(pdfUrl) {
     panelActive = true;
   }
   
-function checkAndShowKerryTip() {
-  // 檢查是否已經有嘉里大榮的 PDF 資料
-  if (chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['kerryProcessedPages'], (result) => {
-      if (result.kerryProcessedPages && result.kerryProcessedPages.length > 0) {
-        // 轉換為物流單格式
-        const kerryShippingData = result.kerryProcessedPages.map((page, index) => ({
-          html: `<img src="${page.dataUrl}" style="width: 100%; height: auto;">`,
-          orderNo: `KERRY-${page.pageNum}`, // 暫時編號，稍後會配對
-          serviceCode: `K${Date.now()}${page.pageNum}`,
-          width: '100mm',
-          height: '150mm',
-          index: index,
-          provider: 'kerry',
-          isPdf: true,
-          isOnlineProcessed: true,
-          pageNumber: page.pageNum,
-          originalWidth: page.width,
-          originalHeight: page.height
-        }));
-        
-        // 儲存到 pdfShippingData
-        pdfShippingData = kerryShippingData;
-        
-        // 更新狀態
-        updateDataStatus();
-        
-        // 自動配對訂單編號
-        autoMatchKerryOrders();
-        
-        showNotification(`已載入 ${kerryShippingData.length} 張嘉里大榮物流單`, 'success');
-      }
-    });
+  function checkAndShowKerryTip() {
+    // 檢查是否已經有嘉里大榮的 PDF 資料
+    if (chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(['kerryProcessedPages'], (result) => {
+        if (result.kerryProcessedPages && result.kerryProcessedPages.length > 0) {
+          // 轉換為物流單格式
+          const kerryShippingData = result.kerryProcessedPages.map((page, index) => ({
+            html: `<img src="${page.dataUrl}" style="width: 100%; height: auto;">`,
+            orderNo: `KERRY-${page.pageNum}`, // 暫時編號，稍後會配對
+            serviceCode: `K${Date.now()}${page.pageNum}`,
+            width: '100mm',
+            height: '150mm',
+            index: index,
+            provider: 'kerry',
+            isPdf: true,
+            isOnlineProcessed: true,
+            pageNumber: page.pageNum,
+            originalWidth: page.width,
+            originalHeight: page.height
+          }));
+          
+          // 儲存到 pdfShippingData
+          pdfShippingData = kerryShippingData;
+          
+          // 更新狀態
+          updateDataStatus();
+          
+          // 自動配對訂單編號
+          autoMatchKerryOrders();
+          
+          showNotification(`已載入 ${kerryShippingData.length} 張嘉里大榮物流單`, 'success');
+        }
+      });
+    }
   }
-}
 
-// 自動配對嘉里大榮訂單編號（移到外部）
-function autoMatchKerryOrders() {
-  // 如果已有明細資料，立即配對
-  if (detailData.length > 0 && pdfShippingData.length > 0) {
-    matchKerryOrderNumbers();
-  } else {
-    // 等待明細資料載入後再配對
-    setTimeout(() => {
-      if (detailData.length > 0) {
-        matchKerryOrderNumbers();
-      }
-    }, 2000);
+  // 自動配對嘉里大榮訂單編號（移到外部）
+  function autoMatchKerryOrders() {
+    // 如果已有明細資料，立即配對
+    if (detailData.length > 0 && pdfShippingData.length > 0) {
+      matchKerryOrderNumbers();
+    } else {
+      // 等待明細資料載入後再配對
+      setTimeout(() => {
+        if (detailData.length > 0) {
+          matchKerryOrderNumbers();
+        }
+      }, 2000);
+    }
   }
-}
 
-// 配對嘉里大榮訂單編號（移到外部）
-function matchKerryOrderNumbers() {
-  // 確保數量相符
-  if (pdfShippingData.length === detailData.length) {
-    // 按順序配對
-    pdfShippingData.forEach((shipping, index) => {
-      if (detailData[index]) {
-        shipping.orderNo = detailData[index].orderNo;
-        shipping.matchedDetailIndex = index;
-      }
-    });
-    
-    // 更新預覽
-    updatePreview();
-    
-    showNotification('已自動配對訂單編號', 'success');
-  } else {
-    showNotification(`物流單數量(${pdfShippingData.length})與明細數量(${detailData.length})不符，請手動調整`, 'warning');
+  // 配對嘉里大榮訂單編號（移到外部）
+  function matchKerryOrderNumbers() {
+    // 確保數量相符
+    if (pdfShippingData.length === detailData.length) {
+      // 按順序配對
+      pdfShippingData.forEach((shipping, index) => {
+        if (detailData[index]) {
+          shipping.orderNo = detailData[index].orderNo;
+          shipping.matchedDetailIndex = index;
+        }
+      });
+      
+      // 更新預覽
+      updatePreview();
+      
+      showNotification('已自動配對訂單編號', 'success');
+    } else {
+      showNotification(`物流單數量(${pdfShippingData.length})與明細數量(${detailData.length})不符，請手動調整`, 'warning');
+    }
   }
-}
-
       
   function deactivateDetailPanel() {
     if (!panelActive) return;
@@ -1239,7 +1283,7 @@ function matchKerryOrderNumbers() {
     document.getElementById('bv-clear-data')?.addEventListener('click', () => {
       if (confirm('確定要清除所有資料嗎？這將清除物流單和明細資料。')) {
         if (chrome.storage && chrome.storage.local) {
-          chrome.storage.local.remove(['bvShippingData', 'bvDetailData', 'bvPdfShippingData'], () => {
+          chrome.storage.local.remove(['bvShippingData', 'bvDetailData', 'bvPdfShippingData', 'kerryProcessedPages'], () => {
             shippingData = [];
             detailData = [];
             pdfShippingData = [];
@@ -1292,191 +1336,6 @@ function matchKerryOrderNumbers() {
   
     // 載入所有超商設定
     loadAllProviderSettings();
-    
-    // 設定 PDF 上傳
-    setupPdfUpload();
-  }
-  
-  // 設定 PDF 上傳功能
-  function setupPdfUpload() {
-    const uploadArea = document.getElementById('bv-pdf-upload-area');
-    const fileInput = document.getElementById('bv-pdf-input');
-    const uploadPrompt = document.getElementById('bv-pdf-upload-prompt');
-    const pdfInfo = document.getElementById('bv-pdf-info');
-    
-    if (!uploadArea || !fileInput) return;
-    
-    uploadArea.addEventListener('click', () => fileInput.click());
-    
-    // 拖放功能
-    uploadArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      uploadArea.style.borderColor = '#d32f2f';
-      uploadArea.style.background = '#ffebee';
-    });
-    
-    uploadArea.addEventListener('dragleave', () => {
-      uploadArea.style.borderColor = '#f44336';
-      uploadArea.style.background = 'white';
-    });
-    
-    uploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadArea.style.borderColor = '#f44336';
-      uploadArea.style.background = 'white';
-      
-      const files = e.dataTransfer.files;
-      if (files.length > 0 && files[0].type === 'application/pdf') {
-        handlePdfFile(files[0]);
-      }
-    });
-    
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file && file.type === 'application/pdf') {
-        handlePdfFile(file);
-      }
-    });
-  }
-  
-  // 處理 PDF 檔案 - 修正版
-  async function handlePdfFile(file) {
-    const uploadArea = document.getElementById('bv-pdf-upload-area');
-    const uploadPrompt = document.getElementById('bv-pdf-upload-prompt');
-    const pdfInfo = document.getElementById('bv-pdf-info');
-    const filename = document.getElementById('bv-pdf-filename');
-    const pagesText = document.getElementById('bv-pdf-pages');
-    const progressDiv = document.getElementById('bv-conversion-progress');
-    const progressFill = document.getElementById('bv-conversion-progress-fill');
-    const statusText = document.getElementById('bv-conversion-status');
-    
-    // 顯示檔案資訊
-    uploadArea.classList.add('has-file');
-    uploadPrompt.style.display = 'none';
-    pdfInfo.style.display = 'flex';
-    filename.textContent = file.name;
-    
-    // 顯示轉換進度
-    progressDiv.classList.add('active');
-    progressFill.style.width = '0%';
-    statusText.textContent = '載入 PDF...';
-    
-    try {
-      // 檢查各種可能的 PDF.js 位置
-      let pdfjs = null;
-      
-      // 嘗試找到 pdfjsLib
-      if (typeof pdfjsLib !== 'undefined' && pdfjsLib) {
-        pdfjs = pdfjsLib;
-        console.log('找到 pdfjsLib (全域)');
-      } else if (typeof window.pdfjsLib !== 'undefined' && window.pdfjsLib) {
-        pdfjs = window.pdfjsLib;
-        console.log('找到 window.pdfjsLib');
-      } else if (typeof window['pdfjs-dist/build/pdf'] !== 'undefined' && window['pdfjs-dist/build/pdf']) {
-        pdfjs = window['pdfjs-dist/build/pdf'];
-        console.log('找到 window["pdfjs-dist/build/pdf"]');
-      }
-      
-      if (!pdfjs) {
-        // 列出所有包含 pdf 的全域變數
-        const pdfRelatedKeys = Object.keys(window).filter(key => 
-          key.toLowerCase().includes('pdf') && window[key]
-        );
-        console.error('找不到 PDF.js，相關的全域變數:', pdfRelatedKeys);
-        throw new Error('PDF.js 未載入，請確認 pdf.js 檔案存在並已正確載入');
-      }
-      
-      // 設定 worker
-      if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
-        pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.js');
-        console.log('已設定 PDF.js worker');
-      }
-      
-      // 讀取 PDF 檔案
-      const arrayBuffer = await file.arrayBuffer();
-      const typedArray = new Uint8Array(arrayBuffer);
-      
-      // 載入 PDF
-      statusText.textContent = '解析 PDF...';
-      progressFill.style.width = '20%';
-      
-      const loadingTask = pdfjs.getDocument({data: typedArray});
-      const pdf = await loadingTask.promise;
-      const numPages = pdf.numPages;
-      pagesText.textContent = `共 ${numPages} 頁`;
-      
-      // 轉換每一頁為圖片
-      pdfShippingData = [];
-      
-      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-        statusText.textContent = `轉換第 ${pageNum}/${numPages} 頁...`;
-        progressFill.style.width = `${20 + (pageNum / numPages * 70)}%`;
-        
-        const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2.0 }); // 使用較高解析度
-        
-        // 創建 canvas
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        
-        // 渲染 PDF 頁面到 canvas
-        await page.render({
-          canvasContext: context,
-          viewport: viewport
-        }).promise;
-        
-        // 轉換為圖片
-        const imageData = canvas.toDataURL('image/png');
-        
-        // 創建物流單資料
-        const shippingItem = {
-          html: `<img src="${imageData}" style="width: 100%; height: auto;">`,
-          orderNo: `KERRY-${pageNum}`, // 使用頁碼作為臨時訂單編號
-          serviceCode: `K${Date.now()}${pageNum}`, // 生成唯一的服務代碼
-          width: '100mm',
-          height: '150mm',
-          index: pageNum - 1,
-          provider: 'kerry',
-          isPdf: true,
-          pageNumber: pageNum,
-          totalPages: numPages
-        };
-        
-        pdfShippingData.push(shippingItem);
-      }
-      
-      // 儲存 PDF 物流單資料
-      if (chrome.storage && chrome.storage.local) {
-        chrome.storage.local.set({ bvPdfShippingData: pdfShippingData }, () => {
-          statusText.textContent = `轉換完成！已產生 ${numPages} 張物流單`;
-          progressFill.style.width = '100%';
-          
-          // 更新狀態
-          updateDataStatus();
-          updatePreview();
-          
-          showNotification(`成功轉換 ${numPages} 頁 PDF 為物流單`, 'success');
-          
-          // 3秒後隱藏進度條
-          setTimeout(() => {
-            progressDiv.classList.remove('active');
-          }, 3000);
-        });
-      }
-      
-    } catch (error) {
-      console.error('處理 PDF 時發生錯誤:', error);
-      statusText.textContent = '轉換失敗';
-      showNotification('PDF 處理失敗：' + error.message, 'error');
-      
-      // 重置狀態
-      uploadArea.classList.remove('has-file');
-      uploadPrompt.style.display = 'flex';
-      pdfInfo.style.display = 'none';
-      progressDiv.classList.remove('active');
-    }
   }
   
   function fetchDetailData() {
@@ -2773,6 +2632,7 @@ function matchKerryOrderNumbers() {
   function updateDataStatus() {
     const shippingCount = document.getElementById('bv-shipping-count');
     const detailCount = document.getElementById('bv-detail-count');
+    const kerryStatus = document.getElementById('bv-kerry-status');
     
     // 計算總物流單數量（包含 PDF）
     const totalShippingCount = shippingData.length + pdfShippingData.length;
@@ -2794,6 +2654,11 @@ function matchKerryOrderNumbers() {
     if (detailCount) {
       detailCount.textContent = detailData.length > 0 ? `已抓取 ${detailData.length} 張` : '未抓取';
       detailCount.className = detailData.length > 0 ? 'bv-status-badge success' : 'bv-status-badge';
+    }
+    
+    // 顯示嘉里大榮狀態
+    if (kerryStatus && pdfShippingData.length > 0) {
+      kerryStatus.style.display = 'block';
     }
   }
   
@@ -3182,46 +3047,47 @@ function matchKerryOrderNumbers() {
     }, 3000);
   }
   
-// === 主程式執行 ===
+  // === 主程式執行 ===
 
-// 根據頁面類型自動執行對應的初始化
-if (currentPage.type === 'shipping') {
-  console.log('偵測到物流單頁面，類型:', currentPage.provider);
-  
-  if (currentPage.provider === 'kerry') {
-    // 執行嘉里大榮特殊處理
-    handleKerryShippingPage();
-  } 
-  // 其他超商物流單才顯示面板
-  else if (currentPage.provider !== 'unknown') {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
+  // 根據頁面類型自動執行對應的初始化
+  if (currentPage.type === 'shipping') {
+    console.log('偵測到物流單頁面，類型:', currentPage.provider);
+    
+    if (currentPage.provider === 'kerry') {
+      // 執行嘉里大榮特殊處理
+      handleKerryShippingPage();
+    } 
+    // 其他超商物流單才顯示面板
+    else if (currentPage.provider !== 'unknown') {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          if (checkExtensionValid()) {
+            setTimeout(injectShippingPanel, 300);
+          }
+        });
+      } else {
         if (checkExtensionValid()) {
           setTimeout(injectShippingPanel, 300);
         }
-      });
-    } else {
-      if (checkExtensionValid()) {
-        setTimeout(injectShippingPanel, 300);
       }
     }
-  }
-} else if (currentPage.type === 'detail') {
-  // 明細頁也自動啟動
-  console.log('BV SHOP 出貨明細頁面已偵測，自動啟動助手');
-  
-  // 自動啟動面板
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
+  } else if (currentPage.type === 'detail') {
+    // 明細頁也自動啟動
+    console.log('BV SHOP 出貨明細頁面已偵測，自動啟動助手');
+    
+    // 自動啟動面板
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          activateDetailPanel();
+        }, 500);
+      });
+    } else {
       setTimeout(() => {
         activateDetailPanel();
       }, 500);
-    });
-  } else {
-    setTimeout(() => {
-      activateDetailPanel();
-    }, 500);
+    }
   }
-}
 
-})(); 
+})();
+        
