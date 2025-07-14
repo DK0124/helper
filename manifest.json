@@ -43,7 +43,6 @@
         "*://kerrytj.com/*"
       ],
       "js": [
-        "pdf.js",
         "content.js"
       ],
       "css": ["content.css"],
@@ -62,10 +61,7 @@
     {
       "resources": [
         "pdf.js",
-        "pdf.worker.js",
-        "kerry-panel.html",
-        "kerry-panel.js",
-        "kerry-panel.css"
+        "pdf.worker.js"
       ],
       "matches": ["<all_urls>"]
     }
